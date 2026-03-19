@@ -1,0 +1,2 @@
+# 将所有 JS 标记为“生成文件”或“第三方库”，不计入统计
+*.js linguist-generated=true
