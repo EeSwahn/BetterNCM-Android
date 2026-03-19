@@ -82,13 +82,15 @@ class SearchViewModel : ViewModel() {
         }
     }
 
-    fun playSong(song: Song) {
+    fun playSong(song: Song, songs: List<Song> = _uiState.value.songs) {
         viewModelScope.launch {
             _playingState.value = PlayingUiState(isLoading = true)
             when (val result = repository.getSongUrl(song.id)) {
                 is Result.Success -> {
                     _playingState.value = PlayingUiState(isLoading = false)
-                    MusicPlayer.playSong(song, result.data)
+                    val playlist = songs.ifEmpty { listOf(song) }
+                    val startIndex = playlist.indexOfFirst { it.id == song.id }.takeIf { it >= 0 } ?: 0
+                    MusicPlayer.playSongs(playlist, startIndex, result.data)
                 }
                 is Result.Error -> {
                     _playingState.value = PlayingUiState(
@@ -99,6 +101,10 @@ class SearchViewModel : ViewModel() {
                 else -> {}
             }
         }
+    }
+
+    fun addSongToPlayNext(song: Song) {
+        MusicPlayer.enqueueNext(song)
     }
 
     fun clearError() {

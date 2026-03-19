@@ -142,7 +142,8 @@ fun SearchScreen(
                                 items(uiState.songs, key = { it.id }) { song ->
                                     ModernSongCard(
                                         song = song,
-                                        onClick = { searchViewModel.playSong(song) }
+                                        onClick = { searchViewModel.playSong(song, uiState.songs) },
+                                        onPlayNext = { searchViewModel.addSongToPlayNext(song) }
                                     )
                                 }
                             }
@@ -435,7 +436,8 @@ private fun MusicSearchBar(
 @Composable
 private fun ModernSongCard(
     song: Song,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onPlayNext: () -> Unit
 ) {
     Surface(
         color = Color(0xFF232527).copy(alpha = 0.7f),
@@ -490,42 +492,58 @@ private fun ModernSongCard(
 
             // 控制区
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 播放/暂停按钮 (图中是一个圆形背景的暂停图标)
+                TextButton(
+                    onClick = onPlayNext,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.08f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlaylistPlay,
+                        contentDescription = "添加到下一首播放",
+                        tint = Color(0xFFBFDFFF),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "下一首", color = Color(0xFFBFDFFF), fontSize = 12.sp)
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
                 Box(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.1f)),
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .clickable(onClick = onClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Pause,
-                        contentDescription = null,
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "播放",
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.width(12.dp))
-                
-                Icon(
-                    imageVector = Icons.Rounded.MoreHoriz,
-                    contentDescription = null,
-                    tint = Color(0xFF6A6C6E),
-                    modifier = Modifier.size(24.dp)
-                )
-                
-                Spacer(modifier = Modifier.width(12.dp))
-                
+
                 // 时长
                 Text(
-                    text = "3:50", // 假数据，原图中显示在末尾
+                    text = formatSongDuration(song.durationMs),
                     color = Color(0xFF6A6C6E),
                     fontSize = 12.sp
                 )
             }
         }
     }
+}
+
+private fun formatSongDuration(durationMs: Long): String {
+    val totalSeconds = (durationMs / 1000L).coerceAtLeast(0L)
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return String.format("%d:%02d", minutes, seconds)
 }
 
 @Composable

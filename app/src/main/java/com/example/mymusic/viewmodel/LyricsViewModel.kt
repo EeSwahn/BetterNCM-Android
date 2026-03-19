@@ -217,8 +217,15 @@ fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
                 if (wordMatches.isNotEmpty()) {
                     for (i in wordMatches.indices) {
                          val m = wordMatches[i]
-                         val startOff = m.groupValues[1].toInt()
+                         val rawStart = m.groupValues[1].toInt()
                          val dur = m.groupValues[2].toInt()
+                         // 网易云 YRC 的字标签通常是绝对时间；UI 渲染层需要相对当前行起点的偏移。
+                         // 这里兼容两种格式：绝对毫秒时间 / 相对行起点偏移。
+                         val startOff = if (rawStart >= startTime) {
+                             (rawStart - startTime).toInt()
+                         } else {
+                             rawStart
+                         }
                          
                          val textStart = m.range.last + 1
                          val textEnd = if (i + 1 < wordMatches.size) wordMatches[i+1].range.first else contentPart.length

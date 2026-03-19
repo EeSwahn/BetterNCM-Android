@@ -167,7 +167,7 @@ private fun PlayerBarContent(state: PlayerState, onClick: () -> Unit) {
 
             // 歌曲结束 / 清空（预留）
             IconButton(
-                onClick = { MusicPlayer.stop() },
+                onClick = { MusicPlayer.clearQueue() },
                 modifier = Modifier.size(36.dp)
             ) {
                 Icon(
