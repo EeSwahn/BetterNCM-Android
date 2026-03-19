@@ -20,3 +20,6 @@ BetterNCM-Android
 📦 下载体验
 请前往 [Releases] 页面获取最新的测试版 APK。
 <img width="2941" height="1759" alt="Screenshot_20260319-222723" src="https://github.com/user-attachments/assets/a9820142-8345-452f-b924-1cf325ab19de" />
+
+​本项目的部分核心接口封装与加密逻辑（Crypto）参考并集成了 NeteaseCloudMusicApiEnhanced 项目的优秀实现。
+​感谢原作者在网易云协议逆向领域的深耕。
