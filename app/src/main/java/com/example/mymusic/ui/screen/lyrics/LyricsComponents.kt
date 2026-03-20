@@ -88,35 +88,38 @@ fun LyricsPanel(
 
     LaunchedEffect(lyricsState.currentLineIndex) {
         val activeIndex = lyricsState.currentLineIndex
-        if (activeIndex >= 0) {
-            var layoutInfo = listState.layoutInfo
-            var viewportHeight = layoutInfo.viewportSize.height
-            if (viewportHeight == 0) {
-                delay(50)
-                layoutInfo = listState.layoutInfo
-                viewportHeight = layoutInfo.viewportSize.height
-            }
-            if (viewportHeight == 0) return@LaunchedEffect
+        if (activeIndex < 0) {
+            listState.scrollToItem(0)
+            return@LaunchedEffect
+        }
 
-            var activeItemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
-            if (activeItemInfo == null) {
-                val jumpIndex = (activeIndex - if (isPhone) 3 else 2).coerceAtLeast(0)
-                listState.scrollToItem(jumpIndex)
-                delay(30)
-                layoutInfo = listState.layoutInfo
-                activeItemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
-            }
+        var layoutInfo = listState.layoutInfo
+        var viewportHeight = layoutInfo.viewportSize.height
+        if (viewportHeight == 0) {
+            delay(50)
+            layoutInfo = listState.layoutInfo
+            viewportHeight = layoutInfo.viewportSize.height
+        }
+        if (viewportHeight == 0) return@LaunchedEffect
 
-            if (activeItemInfo != null) {
-                val activeCenter = activeItemInfo.offset + (activeItemInfo.size / 2)
-                val viewportCenter = (viewportHeight * 0.38f).toInt()
-                val distanceToScroll = activeCenter - viewportCenter
-                val duration = (500 / verticalScrollSpeed).toInt().coerceAtLeast(100)
-                listState.animateScrollBy(
-                    value = distanceToScroll.toFloat(),
-                    animationSpec = tween(durationMillis = duration, easing = FastOutSlowInEasing)
-                )
-            }
+        var activeItemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
+        if (activeItemInfo == null) {
+            val jumpIndex = (activeIndex - if (isPhone) 3 else 2).coerceAtLeast(0)
+            listState.scrollToItem(jumpIndex)
+            delay(30)
+            layoutInfo = listState.layoutInfo
+            activeItemInfo = layoutInfo.visibleItemsInfo.find { it.index == activeIndex }
+        }
+
+        if (activeItemInfo != null) {
+            val activeCenter = activeItemInfo.offset + (activeItemInfo.size / 2)
+            val viewportCenter = (viewportHeight * if (isPhone) 0.34f else 0.38f).toInt()
+            val distanceToScroll = activeCenter - viewportCenter
+            val duration = (500 / verticalScrollSpeed).toInt().coerceAtLeast(100)
+            listState.animateScrollBy(
+                value = distanceToScroll.toFloat(),
+                animationSpec = tween(durationMillis = duration, easing = FastOutSlowInEasing)
+            )
         }
     }
 
@@ -251,7 +254,7 @@ fun LyricLineItem(
                 if (animationConfig.enableGlowEffect) modifier.glowEffect(isCurrent = isCurrent, glowColor = Color.White) else modifier
             }
             .padding(
-                horizontal = if (isPhone) 16.dp else 32.dp,
+                horizontal = if (isPhone) 4.dp else 32.dp,
                 vertical = 4.dp * lineSpacingRatio
             )
             .graphicsLayer {

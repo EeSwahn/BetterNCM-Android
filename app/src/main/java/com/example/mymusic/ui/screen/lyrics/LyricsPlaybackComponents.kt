@@ -50,6 +50,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -75,6 +76,7 @@ import com.example.mymusic.ui.theme.NeteaseRed
 import com.example.mymusic.ui.theme.TextPrimary
 import com.example.mymusic.ui.theme.TextSecondary
 import com.example.mymusic.ui.theme.TextTertiary
+import kotlin.math.abs
 
 @Composable
 fun ProgressBarOnly(
@@ -83,15 +85,32 @@ fun ProgressBarOnly(
     widthRatio: Float = 1.0f
 ) {
     val playerState by MusicPlayer.playerState.collectAsState()
+    var isDragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableStateOf(0f) }
+    var pendingSeekPositionMs by remember { mutableStateOf<Long?>(null) }
     val rawProgress = if (playerState.duration > 0) {
         (playerState.currentPosition.toFloat() / playerState.duration).coerceIn(0f, 1f)
     } else 0f
+    val targetProgress = when {
+        isDragging -> dragProgress
+        pendingSeekPositionMs != null && playerState.duration > 0 -> {
+            (pendingSeekPositionMs!!.toFloat() / playerState.duration).coerceIn(0f, 1f)
+        }
+        else -> rawProgress
+    }
 
     val progress by animateFloatAsState(
-        targetValue = rawProgress,
+        targetValue = targetProgress,
         animationSpec = tween(durationMillis = 100, easing = LinearEasing),
         label = "progress"
     )
+
+    LaunchedEffect(playerState.currentPosition, pendingSeekPositionMs) {
+        val pending = pendingSeekPositionMs ?: return@LaunchedEffect
+        if (abs(playerState.currentPosition - pending) <= 300L) {
+            pendingSeekPositionMs = null
+        }
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -99,19 +118,18 @@ fun ProgressBarOnly(
             .fillMaxWidth()
             .offset(x = offsetX.dp, y = offsetY.dp)
     ) {
-        var isDragging by remember { mutableStateOf(false) }
-        var dragProgress by remember { mutableStateOf(0f) }
-
         Box(modifier = Modifier.fillMaxWidth(widthRatio)) {
             CustomProgressBar(
                 value = if (isDragging) dragProgress else progress,
                 onValueChange = {
+                    pendingSeekPositionMs = null
                     isDragging = true
                     dragProgress = it
                 },
                 onValueChangeFinished = {
-                    isDragging = false
                     val targetMs = (dragProgress * playerState.duration).toLong()
+                    pendingSeekPositionMs = targetMs
+                    isDragging = false
                     MusicPlayer.seekTo(targetMs)
                 }
             )
@@ -125,6 +143,8 @@ fun ProgressBarOnly(
         ) {
             val currentDisplayMs = if (isDragging) {
                 (dragProgress * playerState.duration).toLong()
+            } else if (pendingSeekPositionMs != null) {
+                pendingSeekPositionMs!!
             } else {
                 playerState.currentPosition
             }

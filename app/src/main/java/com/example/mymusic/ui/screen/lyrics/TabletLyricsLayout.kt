@@ -1,6 +1,5 @@
 package com.example.mymusic.ui.screen.lyrics
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -164,39 +163,67 @@ fun TabletLyricsLayout(
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp), horizontalArrangement = Arrangement.End) {
                     SuiXinChangButton(currentSong = song, lyricsViewModel = lyricsViewModel, isPhone = false)
                 }
-                AnimatedVisibility(visible = showSettings) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).padding(horizontal = 32.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SettingSliderRow("滚动速度", verticalScrollSpeed, { verticalScrollSpeed = it }, 0.1f..1.0f, 8)
-                        SettingSliderRow("缩放速度", scaleAnimationSpeed, { scaleAnimationSpeed = it }, 0.1f..1.0f, 8)
-                        SettingSliderRow("居中放大", activeLyricSizeRatio, { activeLyricSizeRatio = it }, 0.1f..1.0f, 8)
-                        SettingSliderRow("所有字号", baseFontSizeRatio, { baseFontSizeRatio = it }, 0.5f..2.0f, 15)
-                        SettingSliderRow("歌词行距", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25)
-                        SettingSliderRow("上浮速度", yrcFloatSpeed, { yrcFloatSpeed = it }, 0.1f..2.0f, 18)
-                        SettingSliderRow("标题X", headerOffsetX, { headerOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("标题Y", headerOffsetY, { headerOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("封面X", coverOffsetX, { coverOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("封面Y", coverOffsetY, { coverOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("音质X", audioSpecOffsetX, { audioSpecOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("音质Y", audioSpecOffsetY, { audioSpecOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("控制X", playbackOffsetX, { playbackOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("控制Y", playbackOffsetY, { playbackOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("底部X", bottomOffsetX, { bottomOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("底部Y", bottomOffsetY, { bottomOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("歌词X", lyricsPanelOffsetX, { lyricsPanelOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("歌词Y", lyricsPanelOffsetY, { lyricsPanelOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("进度条X", progressBarOffsetX, { progressBarOffsetX = it }, -200f..200f, 0)
-                        SettingSliderRow("进度条Y", progressBarOffsetY, { progressBarOffsetY = it }, -200f..200f, 0)
-                        SettingSliderRow("进度条宽", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17)
-                        SettingSliderRow("上浮位移", yrcFloatIntensity, { yrcFloatIntensity = it }, 0f..50f, 0)
-                        SettingSliderRow("逐字偏移", wordTimingOffsetMs, { wordTimingOffsetMs = it }, -1000f..1000f, 39)
-                        SettingSliderRow("缩放速度", wordScaleSpeed, { wordScaleSpeed = it }, 0.1f..2.0f, 10)
-                        SettingSliderRow("缩放大小", wordScaleSize, { wordScaleSize = it }, 1.0f..2.0f, 13)
-                    }
-                }
             }
         }
+    }
+
+    if (showSettings) {
+        LyricsSettingsBottomSheet(
+            title = "歌词布局与动画",
+            subtitle = "平板模式下把动画参数和布局校准拆成几组，避免一长串滑块直接铺在正文里。",
+            isPhone = false,
+            sections = listOf(
+                SliderSettingSection(
+                    title = "歌词动画",
+                    description = "控制滚动、缩放和基础版式，影响主歌词区的整体节奏。",
+                    items = listOf(
+                        SliderSettingItem("滚动速度", "歌词追焦时的纵向滚动速度。", verticalScrollSpeed, { verticalScrollSpeed = it }, 0.1f..1.0f, 8),
+                        SliderSettingItem("缩放速度", "当前行高亮时的缩放进入速度。", scaleAnimationSpeed, { scaleAnimationSpeed = it }, 0.1f..1.0f, 8),
+                        SliderSettingItem("居中放大", "控制视觉中心处当前歌词的强调程度。", activeLyricSizeRatio, { activeLyricSizeRatio = it }, 0.1f..1.0f, 8),
+                        SliderSettingItem("所有字号", "统一缩放歌词字号，快速试不同观感。", baseFontSizeRatio, { baseFontSizeRatio = it }, 0.5f..2.0f, 15),
+                        SliderSettingItem("歌词行距", "让歌词排布更紧凑或更舒展。", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "逐字细节",
+                    description = "逐字歌词开启后，用这些参数做时序和动效校准。",
+                    items = listOf(
+                        SliderSettingItem("上浮速度", "控制逐字高亮向上浮动的响应速度。", yrcFloatSpeed, { yrcFloatSpeed = it }, 0.1f..2.0f, 18),
+                        SliderSettingItem("上浮位移", "控制每个字高亮时抬升的幅度。", yrcFloatIntensity, { yrcFloatIntensity = it }, 0f..50f, 0),
+                        SliderSettingItem("逐字偏移", "整体提前或延后逐字时间点。", wordTimingOffsetMs, { wordTimingOffsetMs = it }, -1000f..1000f, 39),
+                        SliderSettingItem("缩放速度", "控制单字放大动画的速度。", wordScaleSpeed, { wordScaleSpeed = it }, 0.1f..2.0f, 10),
+                        SliderSettingItem("缩放大小", "控制单字高亮时的最大放大比例。", wordScaleSize, { wordScaleSize = it }, 1.0f..2.0f, 13)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "左侧布局校准",
+                    description = "主要用于校准标题、封面、音质信息和底部控制的相对位置。",
+                    items = listOf(
+                        SliderSettingItem("标题X", "微调标题区的水平位置。", headerOffsetX, { headerOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("标题Y", "微调标题区的垂直位置。", headerOffsetY, { headerOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("封面X", "微调封面的水平位置。", coverOffsetX, { coverOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("封面Y", "微调封面的垂直位置。", coverOffsetY, { coverOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("音质X", "微调音质文本的水平位置。", audioSpecOffsetX, { audioSpecOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("音质Y", "微调音质文本的垂直位置。", audioSpecOffsetY, { audioSpecOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("控制X", "微调播放控制区的水平位置。", playbackOffsetX, { playbackOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("控制Y", "微调播放控制区的垂直位置。", playbackOffsetY, { playbackOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("底部X", "微调底部动作按钮的水平位置。", bottomOffsetX, { bottomOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("底部Y", "微调底部动作按钮的垂直位置。", bottomOffsetY, { bottomOffsetY = it }, -200f..200f, 0)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "右侧布局校准",
+                    description = "专门调整歌词区和进度条在平板大屏里的落位。",
+                    items = listOf(
+                        SliderSettingItem("歌词X", "微调右侧歌词面板的水平位置。", lyricsPanelOffsetX, { lyricsPanelOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("歌词Y", "微调右侧歌词面板的垂直位置。", lyricsPanelOffsetY, { lyricsPanelOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("进度条X", "微调进度条的水平位置。", progressBarOffsetX, { progressBarOffsetX = it }, -200f..200f, 0),
+                        SliderSettingItem("进度条Y", "微调进度条的垂直位置。", progressBarOffsetY, { progressBarOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("进度条宽", "缩放进度条宽度，匹配不同平板比例。", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17)
+                    )
+                )
+            ),
+            onDismiss = { showSettings = false }
+        )
     }
 }
