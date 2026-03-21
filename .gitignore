@@ -31,3 +31,9 @@ logcat.txt
 tmp.txt
 对话记录.txt
 test.kt
+
+# Excluded by request
+.vscode/
+logo.png
+*.ps1
+MEMORY_BNA.md
