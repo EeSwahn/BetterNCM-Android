@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.example.mymusic"
+    namespace = "com.example.bna"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.mymusic"
+        applicationId = "com.example.bna"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1"
+        versionCode = 5
+        versionName = "1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -1,16 +1,25 @@
-# MyMusic
+BetterNCM-Android
+> 基于 BetterNCM 灵感开发的 Android 第三方练习项目，专注于流畅的歌词交互体验。
+> 
+本项目是一个出于个人兴趣开发的网易云音乐第三方 Android 客户端（练习作）。在借鉴了 BetterNCM 设计理念的基础上，尝试在移动端实现更丝滑、更高清的动态歌词展示效果。本仓库是受 BetterNCM 启发而开发的 Android 练习项目，与 BetterNCM 官方团队无隶属关系。
 
-A music application built with Kotlin and Jetpack Compose.
+🌟 核心功能
+ * 逐字随心唱支持
+   * 深入探索并接入了网易云“随心唱”接口数据，实现了高精度的逐字同步效果，让歌词律动更贴合人声。
+ * 交互动效优化
+   * 针对高刷新率设备进行了专门的动画性能调优，力求在复杂的背景渲染下依然保持稳定、顺滑的视觉反馈。
+ * 沉浸式平板布局
+   * 采用左侧封面、右侧大字歌词的经典排版，配合动态模糊背景，打造纯净的听歌氛围。
+   * 目前未对手机布局做优化。
+     
+⚠️ 免责声明与开发者说明
+ * 版权声明： 本项目所使用的“网易云音乐”相关 API、Logo 及素材版权归网易公司所有。
+ * 非营利性： 项目仅供个人学习和研究使用，严禁用于任何商业目的。
+ * 维护状态： 作者目前正全力准备国家电网考试，精力有限。如果你在使用中遇到 Bug 或有更好的优化建议，非常欢迎提交 Pull Request，期待与更多同好共同完善。
+   
+📦 下载体验
+请前往 [Releases] 页面获取最新的测试版 APK。
+<img width="2941" height="1759" alt="Screenshot_20260319-222723" src="https://github.com/user-attachments/assets/a9820142-8345-452f-b924-1cf325ab19de" />
 
-## Features
-- Android tablet login support (mimicking PC client QR code scan).
-- Integration with NeteaseCloudMusicApi.
-- Adjustable lyrics display screen.
-
-## Setup
-1. Clone the repository.
-2. Open in Android Studio.
-3. Build and run.
-
-## License
-Open Source
+​本项目的部分核心接口封装与加密逻辑（Crypto）参考并集成了 NeteaseCloudMusicApiEnhanced 项目的优秀实现。
+​感谢原作者在网易云协议逆向领域的深耕。
