@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -131,7 +129,12 @@ fun LyricsPanel(
         }
         lyricsState.hasNoLyric || lyricsState.lyrics.isEmpty() -> {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "暂无歌词", color = TextTertiary, fontSize = 16.sp)
+                Text(
+                    text = lyricsState.lyricErrorMessage ?: "暂无歌词",
+                    color = TextTertiary,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
             }
         }
         else -> {
@@ -207,9 +210,7 @@ fun LyricLineItem(
 
     val fontSize = (baseFontSizeRatio * baseActiveFontSize).coerceIn(8f, 72f)
     val lineHeight = (baseFontSizeRatio * baseActiveLineHeight).coerceIn(12f, 96f)
-    val wordsToUse by remember(line.text, line.durationMs, line.words) {
-        mutableStateOf(line.words ?: generateWordInfoForLine(line))
-    }
+    val wordsToUse by remember(line.words) { mutableStateOf(line.words ?: emptyList()) }
     val usesWordByWordFlow = enableWordByWord && wordsToUse.isNotEmpty() && wordsToUse.size <= 50
 
     val targetAlpha = if (isCurrent) 1f else 0.3f
@@ -339,24 +340,6 @@ fun LyricLineItem(
                         )
                     }
                 }
-            } else if (isCurrent) {
-                val progress = getDetailedLyricsProgress(effectiveCurrentPosition, line)
-                Text(
-                    text = line.text,
-                    style = LocalTextStyle.current.copy(
-                        brush = Brush.horizontalGradient(
-                            0.0f to Color.White,
-                            progress to Color.White,
-                            progress + 0.001f to Color.White.copy(alpha = 0.35f),
-                            1.0f to Color.White.copy(alpha = 0.35f)
-                        )
-                    ),
-                    fontSize = fontSize.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = if (isPhone) TextAlign.Center else TextAlign.Start,
-                    lineHeight = lineHeight.sp,
-                    modifier = Modifier.padding(vertical = 4.dp * lineSpacingRatio)
-                )
             } else {
                 Text(
                     text = line.text,

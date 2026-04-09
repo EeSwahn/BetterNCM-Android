@@ -15,6 +15,7 @@ data class LyricsUiState(
     val currentLineIndex: Int = -1,
     val isLoading: Boolean = false,
     val hasNoLyric: Boolean = false,
+    val lyricErrorMessage: String? = null,
     val suiXinChangLoading: Boolean = false,
     val suiXinChangActive: Boolean = false,
     val suiXinChangVolume: Float = 1.0f,
@@ -45,25 +46,48 @@ class LyricsViewModel : ViewModel() {
         viewModelScope.launch {
             when (val result = repository.getLyric(songId)) {
                 is Result.Success -> {
-                    val yrcText   = result.data.yrc?.lyric    ?: ""
-                    val klyric    = result.data.klyric?.lyric ?: ""
-                    val lrcText   = result.data.lrc?.lyric    ?: ""
+                    val yrcText   = result.data.yrc?.lyric?.trim() ?: ""
                     val transText = result.data.tlyric?.lyric ?: ""
-                    
-                    val lines = when {
-                        yrcText.isNotBlank() -> parseYrc(yrcText, transText)
-                        klyric.isNotBlank() -> parseYrc(klyric, transText)
-                        else -> parseLrc(lrcText, transText)
+
+                    if (yrcText.isBlank()) {
+                        _state.value = LyricsUiState(
+                            hasNoLyric = true,
+                            lyricErrorMessage = "该歌曲没有 YRC 逐字歌词，已停止加载。"
+                        )
+                        return@launch
                     }
-                    
-                    if (lines.isEmpty()) {
-                        _state.value = LyricsUiState(hasNoLyric = true)
-                    } else {
-                        _state.value = LyricsUiState(lyrics = lines)
+
+                    try {
+                        val lines = parseYrc(yrcText, transText)
+                        val validLines = lines.filter { it.text.isNotBlank() }
+                        val timedLineCount = validLines.count { !it.words.isNullOrEmpty() }
+
+                        if (validLines.isEmpty() || timedLineCount == 0) {
+                            _state.value = LyricsUiState(
+                                hasNoLyric = true,
+                                lyricErrorMessage = "YRC 解析失败：未解析出逐字时间数据。"
+                            )
+                        } else {
+                            _state.value = LyricsUiState(lyrics = validLines)
+                        }
+                    } catch (e: Exception) {
+                        _state.value = LyricsUiState(
+                            hasNoLyric = true,
+                            lyricErrorMessage = "YRC 解析异常：${e.message ?: "未知错误"}"
+                        )
                     }
                 }
+                is Result.Error -> {
+                    _state.value = LyricsUiState(
+                        hasNoLyric = true,
+                        lyricErrorMessage = result.message
+                    )
+                }
                 else -> {
-                    _state.value = LyricsUiState(hasNoLyric = true)
+                    _state.value = LyricsUiState(
+                        hasNoLyric = true,
+                        lyricErrorMessage = "歌词加载失败。"
+                    )
                 }
             }
         }
@@ -258,7 +282,7 @@ fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
         }
     }
     
-    return if (lines.isEmpty()) parseLrc(yrcText, transText) else lines
+    return lines
 }
 
 // ─── 内置测试歌词：蔡依林《说爱你》 ─────────────────────────────────────────
@@ -314,4 +338,3 @@ private const val BUILTIN_LRC_SAY_LOVE_YOU = """
 [03:03.38]来自你心里
 [03:05.77]这一刻也终于勇敢说爱你
 """
-
