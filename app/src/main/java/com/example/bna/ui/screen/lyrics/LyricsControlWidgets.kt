@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import android.widget.Toast
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,6 +41,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -57,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -415,8 +419,11 @@ fun LyricsSettingsBottomSheet(
     subtitle: String,
     isPhone: Boolean,
     sections: List<SliderSettingSection>,
+    wordByWordEnabled: Boolean? = null,
+    onWordByWordChange: (Boolean) -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = DarkBackground,
@@ -469,6 +476,48 @@ fun LyricsSettingsBottomSheet(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                if (wordByWordEnabled != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(DarkCard.copy(alpha = 0.72f))
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.06f),
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .padding(horizontal = 16.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "逐字歌词",
+                                color = TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "开启后歌词按单字跟随音乐高亮，关闭则整行显示。",
+                                color = TextTertiary,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
+                        Switch(
+                            checked = wordByWordEnabled,
+                            onCheckedChange = onWordByWordChange,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NeteaseRed,
+                                checkedTrackColor = NeteaseRed.copy(alpha = 0.5f)
+                            )
+                        )
+                    }
+                }
+
                 sections.forEach { section ->
                     Column(
                         modifier = Modifier
@@ -517,6 +566,17 @@ fun LyricsSettingsBottomSheet(
                         }
                     }
                 }
+
+                Button(
+                    onClick = {
+                        val file = exportLyricsSettings(context)
+                        Toast.makeText(context, "已导出：${file.absolutePath}", Toast.LENGTH_LONG).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeteaseRed)
+                ) {
+                    Text("导出当前数值")
+                }
             }
         }
     }
@@ -526,6 +586,7 @@ private fun formatSliderValue(label: String, value: Float): String {
     return when {
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
+        label.contains("间距") -> String.format(java.util.Locale.US, "%.0fdp", value)
         label.contains("宽") && !label.contains("偏移") -> String.format(java.util.Locale.US, "%.1fx", value)
         label.contains("大小") -> String.format(java.util.Locale.US, "%.1fx", value)
         else -> String.format(java.util.Locale.US, "%.1fx", value)
@@ -536,6 +597,7 @@ private fun formatSliderEdgeValue(label: String, value: Float): String {
     return when {
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
+        label.contains("间距") -> String.format(java.util.Locale.US, "%.0f", value)
         else -> String.format(java.util.Locale.US, "%.1f", value)
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -36,25 +37,31 @@ fun TabletLyricsLayout(
     var scaleAnimationSpeed by rememberFloatPreference("scaleAnimationSpeed", 0.5f)
     var activeLyricSizeRatio by rememberFloatPreference("activeLyricSizeRatio", 0.7f)
     var baseFontSizeRatio by rememberFloatPreference("baseFontSizeRatio", 1.3f)
-    var lineSpacingRatio by rememberFloatPreference("lineSpacingRatio", 0.7f)
+    var lineSpacingRatio by rememberFloatPreference("lineSpacingRatio", 0.5f)
     var showSettings by remember { mutableStateOf(false) }
 
     var headerOffsetX by rememberFloatPreference("headerOffsetX", 0f)
-    var headerOffsetY by rememberFloatPreference("headerOffsetY", 0f)
+    var headerOffsetY by rememberFloatPreference("headerOffsetY", 35.966827f)
     var coverOffsetX by rememberFloatPreference("coverOffsetX", 0f)
-    var coverOffsetY by rememberFloatPreference("coverOffsetY", 0f)
+    var coverOffsetY by rememberFloatPreference("coverOffsetY", 50.522354f)
     var audioSpecOffsetX by rememberFloatPreference("audioSpecOffsetX", 0f)
-    var audioSpecOffsetY by rememberFloatPreference("audioSpecOffsetY", 0f)
+    var audioSpecOffsetY by rememberFloatPreference("audioSpecOffsetY", 58.030396f)
     var playbackOffsetX by rememberFloatPreference("playbackOffsetX", 0f)
-    var playbackOffsetY by rememberFloatPreference("playbackOffsetY", 0f)
+    var playbackOffsetY by rememberFloatPreference("playbackOffsetY", 46.11606f)
     var bottomOffsetX by rememberFloatPreference("bottomOffsetX", 0f)
-    var bottomOffsetY by rememberFloatPreference("bottomOffsetY", 0f)
+    var bottomOffsetY by rememberFloatPreference("bottomOffsetY", 40.814377f)
     var lyricsPanelOffsetX by rememberFloatPreference("lyricsPanelOffsetX", 0f)
     var lyricsPanelOffsetY by rememberFloatPreference("lyricsPanelOffsetY", 0f)
     
     var progressBarOffsetX by rememberFloatPreference("progressBarOffsetX", 0f)
-    var progressBarOffsetY by rememberFloatPreference("progressBarOffsetY", 0f)
-    var progressBarWidthRatio by rememberFloatPreference("progressBarWidthRatio", 1.0f)
+    var progressBarOffsetY by rememberFloatPreference("progressBarOffsetY", 53.176422f)
+    var progressBarWidthRatio by rememberFloatPreference("progressBarWidthRatio", 1.2444445f)
+
+    var playbackButtonSizeRatio by rememberFloatPreference("playbackButtonSizeRatio", 0.6888889f)
+    var playbackButtonSpacingDp by rememberFloatPreference("playbackButtonSpacingDp", 0f)
+    var bottomButtonSizeRatio by rememberFloatPreference("bottomButtonSizeRatio", 0.6f)
+    var bottomButtonSpacingDp by rememberFloatPreference("bottomButtonSpacingDp", 0f)
+    var coverSizeRatio by rememberFloatPreference("coverSizeRatio", 1.5f)
 
     var enableWordByWord by rememberBooleanPreference("enableWordByWord", true)
     var yrcFloatSpeed by rememberFloatPreference("yrcFloatSpeed", 2.0f)
@@ -63,11 +70,19 @@ fun TabletLyricsLayout(
     var wordScaleSpeed by rememberFloatPreference("wordScaleSpeed", 0.27f)
     var wordScaleSize by rememberFloatPreference("wordScaleSize", 1.0f)
 
+    // 小尺寸平板适配：所有外边距、列间距按屏幕尺寸等比收缩，限制在原设计值以内
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val screenHeight = configuration.screenHeightDp.dp
+    val outerHorizontalPadding = (screenWidth * 0.055f).coerceIn(16.dp, 64.dp)
+    val outerVerticalPadding = (screenHeight * 0.06f).coerceIn(10.dp, 56.dp)
+    val columnSpacing = (screenWidth * 0.07f).coerceIn(16.dp, 80.dp)
+
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 64.dp, vertical = 56.dp),
-        horizontalArrangement = Arrangement.spacedBy(80.dp)
+            .padding(horizontal = outerHorizontalPadding, vertical = outerVerticalPadding),
+        horizontalArrangement = Arrangement.spacedBy(columnSpacing)
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -75,61 +90,87 @@ fun TabletLyricsLayout(
                 .fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) {
-            val nonCoverHeight = 360.dp 
-            val idealWidth = minOf(maxWidth * 0.95f, maxHeight - nonCoverHeight).coerceAtLeast(200.dp)
+            // 以约 560dp 的左栏内容高度为基准做等比收缩，小屏上所有元素都能完整落位
+            val uiScale = (maxHeight / 560.dp).coerceIn(0.45f, 1f)
+            val nonCoverHeight = 340.dp * uiScale
+            val idealWidth = (minOf(maxWidth * 0.95f, maxHeight - nonCoverHeight).coerceAtLeast(88.dp) * coverSizeRatio)
+                .coerceIn(48.dp, maxWidth * 0.98f)
+
+            // 估算封面以外固定内容的高度（含安全余量）。
+            // 封面调大时多出来的高度从元素间距里借用，间距按比例收缩，
+            // 保证封面能真正变大、底部按钮也永远不会被挤出屏幕
+            val estimatedFixedHeight = 60.dp * uiScale +          // 标题区
+                16.dp +                                            // 音质文本
+                44.dp +                                            // 进度条 + 时间
+                76.dp * uiScale * playbackButtonSizeRatio +        // 播放按钮
+                (52.dp * bottomButtonSizeRatio + 16.dp) * uiScale +// 底部按钮
+                28.dp                                              // 安全余量
+            val coverCapByHeight = (maxHeight - estimatedFixedHeight - 24.dp * uiScale).coerceAtLeast(48.dp)
+            val coverEdge = minOf(idealWidth, coverCapByHeight)
+            val spacerScale = ((maxHeight - estimatedFixedHeight - coverEdge) / (84.dp * uiScale)).coerceIn(0.2f, 1f)
 
             Column(
-                modifier = Modifier.width(idealWidth).fillMaxHeight()
+                modifier = Modifier.width(coverEdge).fillMaxHeight()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().offset(x = headerOffsetX.dp, y = headerOffsetY.dp),
+                    modifier = Modifier.fillMaxWidth().offset(x = (headerOffsetX * uiScale).dp, y = (headerOffsetY * uiScale).dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = song.name, color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Start, maxLines = 1)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(text = song.artistNames, color = TextSecondary, fontSize = 14.sp, textAlign = TextAlign.Start, maxLines = 1)
+                        Text(text = song.name, color = TextPrimary, fontSize = (24f * uiScale).coerceAtLeast(14f).sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Start, maxLines = 1)
+                        Spacer(modifier = Modifier.height(4.dp * uiScale))
+                        Text(text = song.artistNames, color = TextSecondary, fontSize = (14f * uiScale).coerceAtLeast(10f).sp, textAlign = TextAlign.Start, maxLines = 1)
                     }
-                    Icon(Icons.Default.Podcasts, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.Podcasts, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(24.dp * uiScale))
                 }
                 
-                Spacer(modifier = Modifier.height(28.dp))
-                
+                Spacer(modifier = Modifier.height(28.dp * uiScale * spacerScale))
+
+                // 封面吃掉的高度从元素间距里借用，列宽跟随封面实际边长，控件保持与封面同宽
                 Box(
-                    modifier = Modifier.fillMaxWidth().offset(x = coverOffsetX.dp, y = coverOffsetY.dp).aspectRatio(1f).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier
+                        .size(coverEdge)
+                        .offset(x = (coverOffsetX * uiScale).dp, y = (coverOffsetY * uiScale).dp)
+                        .clip(RoundedCornerShape(8.dp))
                 ) {
                     if (song.albumCoverUrl.isNotEmpty()) {
                         AsyncImage(model = song.albumCoverUrl + "?param=800y800", contentDescription = song.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     } else {
                         Box(modifier = Modifier.fillMaxSize().background(DarkCard), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.MusicNote, contentDescription = null, tint = NeteaseRed, modifier = Modifier.size(80.dp))
+                            Icon(Icons.Default.MusicNote, contentDescription = null, tint = NeteaseRed, modifier = Modifier.size(80.dp * uiScale))
                         }
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp * uiScale * spacerScale))
                 
-                Text(text = "AudioTrack    FLAC 16 bits    48 kHz", color = TextTertiary, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().offset(x = audioSpecOffsetX.dp, y = audioSpecOffsetY.dp), textAlign = TextAlign.Center)
+                Text(text = "AudioTrack    FLAC 16 bits    48 kHz", color = TextTertiary, fontSize = (10f * uiScale).coerceAtLeast(8f).sp, modifier = Modifier.fillMaxWidth().offset(x = (audioSpecOffsetX * uiScale).dp, y = (audioSpecOffsetY * uiScale).dp), textAlign = TextAlign.Center)
                 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp * uiScale * spacerScale))
                 
-                ProgressBarOnly(offsetX = progressBarOffsetX, offsetY = progressBarOffsetY, widthRatio = progressBarWidthRatio)
+                ProgressBarOnly(offsetX = progressBarOffsetX * uiScale, offsetY = progressBarOffsetY * uiScale, widthRatio = progressBarWidthRatio)
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp * uiScale * spacerScale))
                 
-                Box(modifier = Modifier.offset(x = playbackOffsetX.dp, y = playbackOffsetY.dp)) {
-                    PlaybackButtonsOnly(isPhone = false)
+                Box(modifier = Modifier.offset(x = (playbackOffsetX * uiScale).dp, y = (playbackOffsetY * uiScale).dp)) {
+                    PlaybackButtonsOnly(
+                        isPhone = false,
+                        scale = uiScale,
+                        buttonSizeRatio = playbackButtonSizeRatio,
+                        buttonSpacingDp = playbackButtonSpacingDp
+                    )
                 }
-                
+
                 Spacer(modifier = Modifier.weight(1f))
-                
+
                 BottomActionButtons(
                     isPhone = false,
-                    modifier = Modifier.offset(x = bottomOffsetX.dp, y = bottomOffsetY.dp),
+                    modifier = Modifier.offset(x = (bottomOffsetX * uiScale).dp, y = (bottomOffsetY * uiScale).dp),
                     onSettingsClick = { showSettings = !showSettings },
-                    enableWordByWord = enableWordByWord,
-                    onWordByWordChange = { enableWordByWord = it }
+                    scale = uiScale,
+                    buttonSizeRatio = bottomButtonSizeRatio,
+                    buttonSpacingDp = bottomButtonSpacingDp
                 )
             }
         }
@@ -137,32 +178,33 @@ fun TabletLyricsLayout(
         Box(
             modifier = Modifier.weight(1.2f).fillMaxHeight()
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth().offset(x = lyricsPanelOffsetX.dp, y = lyricsPanelOffsetY.dp)) {
-                    LyricsPanel(
-                        lyricsState = lyricsState,
-                        lyricsViewModel = lyricsViewModel,
-                        onDismiss = onDismiss,
-                        animationConfig = animationConfig,
-                        verticalScrollSpeed = verticalScrollSpeed,
-                        scaleAnimationSpeed = scaleAnimationSpeed,
-                        activeLyricSizeRatio = activeLyricSizeRatio,
-                        baseFontSizeRatio = baseFontSizeRatio,
-                        lineSpacingRatio = lineSpacingRatio,
-                        enableWordByWord = enableWordByWord,
-                        yrcFloatSpeed = yrcFloatSpeed,
-                        yrcFloatIntensity = yrcFloatIntensity,
-                        wordTimingOffsetMs = wordTimingOffsetMs,
-                        wordScaleSpeed = wordScaleSpeed,
-                        wordScaleSize = wordScaleSize
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp), horizontalArrangement = Arrangement.End) {
-                    SuiXinChangButton(currentSong = song, lyricsViewModel = lyricsViewModel, isPhone = false)
-                }
+            // 歌词面板占满整个右侧区域，底部出现界限与顶部消失界限到屏幕边缘距离相等；
+            // 随心唱按钮悬浮于右下角原位置，不再挤压歌词区
+            Box(modifier = Modifier.fillMaxSize().offset(x = lyricsPanelOffsetX.dp, y = lyricsPanelOffsetY.dp)) {
+                LyricsPanel(
+                    lyricsState = lyricsState,
+                    lyricsViewModel = lyricsViewModel,
+                    onDismiss = onDismiss,
+                    animationConfig = animationConfig,
+                    verticalScrollSpeed = verticalScrollSpeed,
+                    scaleAnimationSpeed = scaleAnimationSpeed,
+                    activeLyricSizeRatio = activeLyricSizeRatio,
+                    baseFontSizeRatio = baseFontSizeRatio,
+                    lineSpacingRatio = lineSpacingRatio,
+                    enableWordByWord = enableWordByWord,
+                    yrcFloatSpeed = yrcFloatSpeed,
+                    yrcFloatIntensity = yrcFloatIntensity,
+                    wordTimingOffsetMs = wordTimingOffsetMs,
+                    wordScaleSpeed = wordScaleSpeed,
+                    wordScaleSize = wordScaleSize
+                )
+            }
+
+            Row(
+                modifier = Modifier.align(Alignment.BottomEnd).padding(horizontal = 32.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                SuiXinChangButton(currentSong = song, lyricsViewModel = lyricsViewModel, isPhone = false)
             }
         }
     }
@@ -172,6 +214,8 @@ fun TabletLyricsLayout(
             title = "歌词布局与动画",
             subtitle = "平板模式下把动画参数和布局校准拆成几组，避免一长串滑块直接铺在正文里。",
             isPhone = false,
+            wordByWordEnabled = enableWordByWord,
+            onWordByWordChange = { enableWordByWord = it },
             sections = listOf(
                 SliderSettingSection(
                     title = "歌词动画",
@@ -196,9 +240,20 @@ fun TabletLyricsLayout(
                     )
                 ),
                 SliderSettingSection(
+                    title = "按钮调节",
+                    description = "调整播放控制和底部动作按钮的大小与间距，间距为 0 时按布局自动分配。",
+                    items = listOf(
+                        SliderSettingItem("播放按钮大小", "整体缩放上一首、播放、下一首三个按钮。", playbackButtonSizeRatio, { playbackButtonSizeRatio = it }, 0.6f..1.4f, 8),
+                        SliderSettingItem("播放按钮间距", "三个播放按钮之间的左右间距，0 表示按屏幕自适应。", playbackButtonSpacingDp, { playbackButtonSpacingDp = it }, 0f..60f, 12),
+                        SliderSettingItem("底部按钮大小", "整体缩放底部一排动作按钮。", bottomButtonSizeRatio, { bottomButtonSizeRatio = it }, 0.6f..1.4f, 8),
+                        SliderSettingItem("底部按钮间距", "底部按钮之间的左右间距，0 表示自动均分整行。", bottomButtonSpacingDp, { bottomButtonSpacingDp = it }, 0f..48f, 12)
+                    )
+                ),
+                SliderSettingSection(
                     title = "左侧布局校准",
                     description = "主要用于校准标题、封面、音质信息和底部控制的相对位置。",
                     items = listOf(
+                        SliderSettingItem("封面大小", "整体缩放左侧封面，其他元素位置保持不变。", coverSizeRatio, { coverSizeRatio = it }, 0.5f..1.5f, 10),
                         SliderSettingItem("标题X", "微调标题区的水平位置。", headerOffsetX, { headerOffsetX = it }, -200f..200f, 0),
                         SliderSettingItem("标题Y", "微调标题区的垂直位置。", headerOffsetY, { headerOffsetY = it }, -200f..200f, 0),
                         SliderSettingItem("封面X", "微调封面的水平位置。", coverOffsetX, { coverOffsetX = it }, -200f..200f, 0),

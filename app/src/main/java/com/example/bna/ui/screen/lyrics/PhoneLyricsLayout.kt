@@ -274,11 +274,6 @@ fun PhoneLyricsLayout(
                         onSettingsClick = {
                             registerLyricsInteraction()
                             showSettings = !showSettings
-                        },
-                        enableWordByWord = enableWordByWord,
-                        onWordByWordChange = {
-                            registerLyricsInteraction()
-                            enableWordByWord = it
                         }
                     )
                 }
@@ -291,6 +286,11 @@ fun PhoneLyricsLayout(
             title = "歌词调节",
             subtitle = "把封面页保持简洁，所有歌词动画和逐字参数集中到这里调整。",
             isPhone = true,
+            wordByWordEnabled = enableWordByWord,
+            onWordByWordChange = {
+                registerLyricsInteraction()
+                enableWordByWord = it
+            },
             sections = listOf(
                 SliderSettingSection(
                     title = "基础节奏",

@@ -20,13 +20,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -37,16 +35,12 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -200,39 +194,58 @@ fun CustomProgressBar(
 
 @Composable
 fun PlaybackButtonsOnly(
-    isPhone: Boolean = false
+    isPhone: Boolean = false,
+    scale: Float = 1f,
+    buttonSizeRatio: Float = 1f,
+    buttonSpacingDp: Float = 0f
 ) {
     val playerState by MusicPlayer.playerState.collectAsState()
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (isPhone) 32.dp else 40.dp, Alignment.CenterHorizontally)
-    ) {
-        IconButton(onClick = { MusicPlayer.playPrevious() }, modifier = Modifier.size(48.dp)) {
-            Icon(
-                imageVector = Icons.Default.SkipPrevious,
-                contentDescription = "上一首",
-                tint = TextPrimary,
-                modifier = Modifier.size(if (isPhone) 28.dp else 32.dp)
-            )
-        }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        // 宽度不足时先压缩间距、再整体缩小按钮，保证“上一首/下一首”始终完整显示
+        val minSpacing = 8.dp
+        val baseSpacing = if (buttonSpacingDp > 0f) buttonSpacingDp.dp else (if (isPhone) 32.dp else 40.dp) * scale
+        val baseSide = (if (isPhone) 40.dp else 48.dp) * scale * buttonSizeRatio
+        val basePlay = (if (isPhone) 64.dp else 72.dp) * scale * buttonSizeRatio
+        val fitScale = if (baseSide * 2 + basePlay + minSpacing * 2 > maxWidth) {
+            ((maxWidth - minSpacing * 2) / (baseSide * 2 + basePlay)).coerceIn(0.5f, 1f)
+        } else 1f
+        val sideSize = baseSide * fitScale
+        val playSize = basePlay * fitScale
+        val sideIcon = (if (isPhone) 28.dp else 32.dp) * scale * buttonSizeRatio * fitScale
+        val playIcon = (if (isPhone) 48.dp else 56.dp) * scale * buttonSizeRatio * fitScale
+        val spacing = ((maxWidth - sideSize * 2 - playSize) / 2).coerceIn(minSpacing, baseSpacing)
 
-        IconButton(onClick = { MusicPlayer.togglePlayPause() }, modifier = Modifier.size(72.dp)) {
-            Icon(
-                imageVector = if (playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (playerState.isPlaying) "暂停" else "播放",
-                tint = Color.White,
-                modifier = Modifier.size(if (isPhone) 48.dp else 56.dp)
-            )
-        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing, Alignment.CenterHorizontally)
+        ) {
+            IconButton(onClick = { MusicPlayer.playPrevious() }, modifier = Modifier.size(sideSize)) {
+                Icon(
+                    imageVector = Icons.Default.SkipPrevious,
+                    contentDescription = "上一首",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(sideIcon)
+                )
+            }
 
-        IconButton(onClick = { MusicPlayer.playNext() }, modifier = Modifier.size(48.dp)) {
-            Icon(
-                imageVector = Icons.Default.SkipNext,
-                contentDescription = "下一首",
-                tint = TextPrimary,
-                modifier = Modifier.size(if (isPhone) 28.dp else 32.dp)
-            )
+            IconButton(onClick = { MusicPlayer.togglePlayPause() }, modifier = Modifier.size(playSize)) {
+                Icon(
+                    imageVector = if (playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                    tint = Color.White,
+                    modifier = Modifier.size(playIcon)
+                )
+            }
+
+            IconButton(onClick = { MusicPlayer.playNext() }, modifier = Modifier.size(sideSize)) {
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "下一首",
+                    tint = Color.White,
+                    modifier = Modifier.size(sideIcon)
+                )
+            }
         }
     }
 }
@@ -256,20 +269,24 @@ fun PlaybackControls(
 fun BottomActionButtons(
     isPhone: Boolean = false,
     modifier: Modifier = Modifier,
-    enableWordByWord: Boolean = false,
-    onWordByWordChange: (Boolean) -> Unit = {},
+    scale: Float = 1f,
+    buttonSizeRatio: Float = 1f,
+    buttonSpacingDp: Float = 0f,
     onSettingsClick: () -> Unit
 ) {
     val playerState by MusicPlayer.playerState.collectAsState()
-    var showMoreMenu by remember { mutableStateOf(false) }
     var showPlaylistSheet by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = if (isPhone) 8.dp else 0.dp)
-            .padding(bottom = if (isPhone) 0.dp else 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(bottom = (if (isPhone) 0.dp else 16.dp) * scale),
+        horizontalArrangement = if (buttonSpacingDp > 0f) {
+            Arrangement.spacedBy(buttonSpacingDp.dp, Alignment.CenterHorizontally)
+        } else {
+            Arrangement.SpaceBetween
+        },
         verticalAlignment = Alignment.CenterVertically
     ) {
         val playbackModeIcon = when (playerState.playbackMode) {
@@ -288,43 +305,12 @@ fun BottomActionButtons(
             contentDescription = playbackModeLabel,
             isPhone = isPhone,
             onClick = { MusicPlayer.cyclePlaybackMode() },
-            tint = NeteaseRed
+            tint = NeteaseRed,
+            scale = scale * buttonSizeRatio
         )
-        ActionButton(Icons.Default.Timer, "定时关闭", isPhone)
-        ActionButton(Icons.Default.Tune, "设置", isPhone, onClick = onSettingsClick)
-        ActionButton(Icons.Default.List, "播放列表", isPhone, onClick = { showPlaylistSheet = true })
-
-        Box(modifier = Modifier.wrapContentSize(Alignment.TopEnd)) {
-            ActionButton(Icons.Default.MoreHoriz, "更多", isPhone, onClick = { showMoreMenu = true })
-
-            DropdownMenu(
-                expanded = showMoreMenu,
-                onDismissRequest = { showMoreMenu = false },
-                modifier = Modifier.background(DarkCard)
-            ) {
-                DropdownMenuItem(
-                    text = { Text("更多选项", color = TextPrimary) },
-                    onClick = { showMoreMenu = false }
-                )
-                DropdownMenuItem(
-                    text = { Text("逐字歌词", color = TextPrimary) },
-                    onClick = {
-                        onWordByWordChange(!enableWordByWord)
-                        showMoreMenu = false
-                    },
-                    trailingIcon = {
-                        Switch(
-                            checked = enableWordByWord,
-                            onCheckedChange = null,
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = NeteaseRed,
-                                checkedTrackColor = NeteaseRed.copy(alpha = 0.5f)
-                            )
-                        )
-                    }
-                )
-            }
-        }
+        ActionButton(Icons.Default.Timer, "定时关闭", isPhone, scale = scale * buttonSizeRatio)
+        ActionButton(Icons.Default.Tune, "设置", isPhone, onClick = onSettingsClick, scale = scale * buttonSizeRatio)
+        ActionButton(Icons.Default.List, "播放列表", isPhone, onClick = { showPlaylistSheet = true }, scale = scale * buttonSizeRatio)
     }
 
     if (showPlaylistSheet) {
@@ -348,17 +334,18 @@ fun ActionButton(
     contentDescription: String,
     isPhone: Boolean,
     onClick: () -> Unit = {},
-    tint: Color = TextSecondary
+    tint: Color = TextSecondary,
+    scale: Float = 1f
 ) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(if (isPhone) 40.dp else 48.dp)
+        modifier = Modifier.size((if (isPhone) 40.dp else 48.dp) * scale)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(if (isPhone) 24.dp else 28.dp)
+            modifier = Modifier.size((if (isPhone) 24.dp else 28.dp) * scale)
         )
     }
 }
