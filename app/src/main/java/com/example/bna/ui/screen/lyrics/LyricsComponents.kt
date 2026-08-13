@@ -502,7 +502,7 @@ fun ScanningGlowText(
         // Scanning glow layer
         Text(
             text = text,
-            color = color,
+            color = Color.Transparent,
             fontSize = fontSize,
             fontWeight = fontWeight,
             textAlign = textAlign,
