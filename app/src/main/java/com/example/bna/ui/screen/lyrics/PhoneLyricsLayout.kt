@@ -1,7 +1,11 @@
 package com.example.bna.ui.screen.lyrics
 
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -9,13 +13,13 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,18 +48,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.palette.graphics.Palette
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.example.bna.data.model.Song
 import com.example.bna.ui.animation.LyricsAnimationConfig
 import com.example.bna.ui.theme.DarkCard
@@ -87,6 +105,9 @@ fun PhoneLyricsLayout(
     var wordTimingOffsetMs by rememberFloatPreference("wordTimingOffsetMs", 0f)
     var wordScaleSpeed by rememberFloatPreference("wordScaleSpeed", 0.4f)
     var wordScaleSize by rememberFloatPreference("wordScaleSize", 1.0f)
+    var glowBrightness by rememberFloatPreference("glowBrightness", 0.09f)
+    var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
+    var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
     var showSettings by remember { mutableStateOf(false) }
     var lyricsControlsVisible by remember { mutableStateOf(true) }
     var lyricsInteractionVersion by remember { mutableStateOf(0) }
@@ -154,12 +175,14 @@ fun PhoneLyricsLayout(
             ) { page ->
                 if (page == 1) {
                     Column {
-                        Text(
+                        ScanningGlowText(
                             text = song.name,
                             color = TextPrimary,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 1
+                            maxLines = 1,
+                            durationMillis = 5500,
+                            glowColor = Color.White
                         )
                         Text(
                             text = song.artistNames,
@@ -173,13 +196,15 @@ fun PhoneLyricsLayout(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
+                        ScanningGlowText(
                             text = song.name,
                             color = TextPrimary,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
-                            maxLines = 1
+                            maxLines = 1,
+                            durationMillis = 5500,
+                            glowColor = Color.White
                         )
                         Text(
                             text = song.artistNames,
@@ -250,7 +275,12 @@ fun PhoneLyricsLayout(
                     }
                 }
             } else {
-                PhoneAlbumPage(song = song)
+                PhoneAlbumPage(
+                    song = song,
+                    glowBrightness = glowBrightness,
+                    glowBreathFrequency = glowBreathFrequency,
+                    glowScaleSize = glowScaleSize
+                )
             }
         }
 
@@ -293,6 +323,15 @@ fun PhoneLyricsLayout(
             },
             sections = listOf(
                 SliderSettingSection(
+                    title = "封面发光",
+                    description = "封面周围的发光效果，颜色自动从封面主色调提取。",
+                    items = listOf(
+                        SliderSettingItem("发光亮度", "控制封面光晕的整体亮度，为 0 时关闭发光。", glowBrightness, { glowBrightness = it }, 0f..1.0f, 10),
+                        SliderSettingItem("发光大小", "控制封面下方发光图层的缩放比例。", glowScaleSize, { glowScaleSize = it }, 1.0f..3.0f, 20),
+                        SliderSettingItem("呼吸频率", "发光明暗交替的速度，为 0 时光晕保持静态。", glowBreathFrequency, { glowBreathFrequency = it }, 0f..5.0f, 10)
+                    )
+                ),
+                SliderSettingSection(
                     title = "基础节奏",
                     description = "控制歌词滚动、缩放和整体排版密度。",
                     items = listOf(
@@ -321,7 +360,65 @@ fun PhoneLyricsLayout(
 }
 
 @Composable
-private fun PhoneAlbumPage(song: Song) {
+private fun PhoneAlbumPage(
+    song: Song,
+    glowBrightness: Float,
+    glowBreathFrequency: Float,
+    glowScaleSize: Float
+) {
+    val context = LocalContext.current
+
+    // 从封面提取主色调
+    var dominantColor by remember { mutableStateOf(NeteaseRed) }
+    LaunchedEffect(song.albumCoverUrl) {
+        if (song.albumCoverUrl.isNotEmpty()) {
+            try {
+                val loader = ImageLoader(context)
+                val request = ImageRequest.Builder(context)
+                    .data(song.albumCoverUrl + "?param=200y200")
+                    .allowHardware(false)
+                    .build()
+                val result = loader.execute(request)
+                if (result is SuccessResult) {
+                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                    if (bitmap != null) {
+                        val palette = Palette.from(bitmap).generate()
+                        val extracted = palette.vibrantSwatch?.rgb
+                            ?: palette.dominantSwatch?.rgb
+                            ?: palette.mutedSwatch?.rgb
+                        if (extracted != null) {
+                            dominantColor = Color(extracted)
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // 提取失败时保留默认色
+            }
+        }
+    }
+
+    // 呼吸动画
+    val breathAnim = remember { Animatable(1.0f) }
+    LaunchedEffect(glowBreathFrequency) {
+        if (glowBreathFrequency > 0.01f) {
+            val periodMs = (1000f / glowBreathFrequency).toInt().coerceAtLeast(200)
+            while (true) {
+                breathAnim.animateTo(
+                    targetValue = 0.45f,
+                    animationSpec = tween(durationMillis = periodMs)
+                )
+                breathAnim.animateTo(
+                    targetValue = 1.0f,
+                    animationSpec = tween(durationMillis = periodMs)
+                )
+            }
+        } else {
+            breathAnim.snapTo(1.0f)
+        }
+    }
+
+    val effectiveGlowAlpha = glowBrightness * breathAnim.value
+
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -335,55 +432,91 @@ private fun PhoneAlbumPage(song: Song) {
             Spacer(modifier = Modifier.weight(0.18f))
 
             Box(
-                modifier = Modifier
-                    .size(coverSize)
-                    .shadow(
-                        elevation = 28.dp,
-                        shape = RoundedCornerShape(22.dp),
-                        spotColor = Color.Black.copy(alpha = 0.55f)
-                    )
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .blur(22.dp)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    NeteaseRed.copy(alpha = 0.22f),
-                                    Color.Transparent
+                // 发光层：位于封面后面，使用低分辨率缩略图做高斯模糊，避免模糊原图消耗性能
+                if (glowBrightness > 0.01f && song.albumCoverUrl.isNotEmpty()) {
+                    val colorMatrix = remember { ColorMatrix().apply { setToSaturation(1.4f) } }
+                    AsyncImage(
+                        model = song.albumCoverUrl + "?param=32y32",
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        colorFilter = ColorFilter.colorMatrix(colorMatrix),
+                        modifier = Modifier
+                            .requiredSize(coverSize * glowScaleSize)
+                            .clip(RoundedCornerShape(22.dp * glowScaleSize))
+                            .graphicsLayer { 
+                                alpha = 0.6f * breathAnim.value 
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                val fadeFraction = 0.15f
+                                drawRect(
+                                    brush = Brush.horizontalGradient(
+                                        0.0f to Color.Transparent,
+                                        fadeFraction to Color.Black,
+                                        1f - fadeFraction to Color.Black,
+                                        1.0f to Color.Transparent,
+                                        startX = 0f,
+                                        endX = size.width
+                                    ),
+                                    blendMode = BlendMode.DstIn
                                 )
-                            )
-                        )
-                )
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        0.0f to Color.Transparent,
+                                        fadeFraction to Color.Black,
+                                        1f - fadeFraction to Color.Black,
+                                        1.0f to Color.Transparent,
+                                        startY = 0f,
+                                        endY = size.height
+                                    ),
+                                    blendMode = BlendMode.DstIn
+                                )
+                            }
+                            .blur(48.dp, BlurredEdgeTreatment.Unbounded)
+                    )
+                }
 
+                // 封面本体
                 Box(
                     modifier = Modifier
-                        .matchParentSize()
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(Color.White.copy(alpha = 0.04f))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(22.dp))
-                ) {
-                    if (song.albumCoverUrl.isNotEmpty()) {
-                        AsyncImage(
-                            model = song.albumCoverUrl + "?param=800y800",
-                            contentDescription = song.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                        .size(coverSize)
+                        .shadow(
+                            elevation = 28.dp,
+                            shape = RoundedCornerShape(22.dp),
+                            spotColor = Color.Black.copy(alpha = 0.55f)
                         )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(DarkCard),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = NeteaseRed,
-                                modifier = Modifier.size(88.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(22.dp))
+                    ) {
+                        if (song.albumCoverUrl.isNotEmpty()) {
+                            AsyncImage(
+                                model = song.albumCoverUrl + "?param=800y800",
+                                contentDescription = song.name,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(DarkCard),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = NeteaseRed,
+                                    modifier = Modifier.size(88.dp)
+                                )
+                            }
                         }
                     }
                 }

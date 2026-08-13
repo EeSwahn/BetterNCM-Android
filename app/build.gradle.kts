@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.bna"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.5"
+        versionCode = 8
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -77,6 +77,9 @@ dependencies {
 
     // ZXing (QR code generation)
     implementation(libs.zxing.core)
+
+    // Palette (cover color extraction)
+    implementation(libs.androidx.palette)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

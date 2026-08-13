@@ -3,6 +3,7 @@ package com.example.bna.ui.screen.lyrics
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
@@ -43,6 +45,15 @@ import androidx.compose.ui.unit.sp
 import com.example.bna.data.model.LyricLine
 import com.example.bna.player.MusicPlayer
 import com.example.bna.ui.animation.LyricsAnimationConfig
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.unit.TextUnit
 import com.example.bna.ui.animation.flowingLightEffect
 import com.example.bna.ui.animation.glowEffect
 import com.example.bna.ui.animation.lyrics3DEffect
@@ -452,3 +463,87 @@ private data class FlowRowData(
     val width: Int,
     val height: Int
 )
+
+@Composable
+fun ScanningGlowText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.White,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    durationMillis: Int = 5500,
+    glowColor: Color = Color.White,
+    glowRadius: Float = 16f
+) {
+    val infiniteTransition = rememberInfiniteTransition()
+    val progress by infiniteTransition.animateFloat(
+        initialValue = -0.5f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "scanningGlowProgress"
+    )
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        // Base layer
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            textAlign = textAlign,
+            maxLines = maxLines
+        )
+        
+        // Scanning glow layer
+        Text(
+            text = text,
+            color = color,
+            fontSize = fontSize,
+            fontWeight = fontWeight,
+            textAlign = textAlign,
+            maxLines = maxLines,
+            style = androidx.compose.ui.text.TextStyle(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = glowColor,
+                    blurRadius = glowRadius
+                )
+            ),
+            modifier = Modifier
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(0, 0) {
+                        placeable.place(-placeable.width / 2, -placeable.height / 2)
+                    }
+                }
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val width = size.width
+                    val center = progress * width
+                    val glowWidth = width * 0.4f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            0.0f to Color.Transparent,
+                            0.5f to Color.Black,
+                            1.0f to Color.Transparent,
+                            startX = center - glowWidth / 2,
+                            endX = center + glowWidth / 2
+                        ),
+                        blendMode = BlendMode.DstIn
+                    )
+                }
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val extra = 24.dp.roundToPx()
+                    layout(placeable.width + extra * 2, placeable.height + extra * 2) {
+                        placeable.place(extra, extra)
+                    }
+                }
+        )
+    }
+}

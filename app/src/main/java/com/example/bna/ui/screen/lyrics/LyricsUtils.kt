@@ -58,6 +58,11 @@ fun formatTime(ms: Long): String {
 data class LyricsSettingDef(val key: String, val defaultValue: Float)
 
 val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = listOf(
+    "封面发光" to listOf(
+        LyricsSettingDef("glowBrightness", 0.09f),
+        LyricsSettingDef("glowBreathFrequency", 0.5f),
+        LyricsSettingDef("glowScaleSize", 1.3f)
+    ),
     "歌词动画" to listOf(
         LyricsSettingDef("verticalScrollSpeed", 0.5f),
         LyricsSettingDef("scaleAnimationSpeed", 0.5f),

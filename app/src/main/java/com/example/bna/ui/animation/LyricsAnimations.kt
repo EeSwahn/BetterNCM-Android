@@ -107,6 +107,7 @@ fun Modifier.smoothScrollEffect(
     )
 }
 
+
 data class LyricsAnimationConfig(
     val enable3DEffect: Boolean = true,
     val enableFlowingLight: Boolean = true,
