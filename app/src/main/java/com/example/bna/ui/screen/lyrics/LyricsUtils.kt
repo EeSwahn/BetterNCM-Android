@@ -52,6 +52,86 @@ fun formatTime(ms: Long): String {
 }
 
 /**
+ * 自定义快速封面颜色提取：
+ * 极度缩小图片后计算亮度和色彩度得分，选取最亮最鲜艳的像素颜色。
+ */
+fun extractVibrantColor(bitmap: android.graphics.Bitmap): androidx.compose.ui.graphics.Color {
+    // 1. 极度缩小到 16x16，将几百万像素降至 256 个，性能开销极小
+    val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, 16, 16, true)
+    
+    var bestColor = android.graphics.Color.WHITE
+    var maxScore = -1f
+    
+    for (x in 0 until scaledBitmap.width) {
+        for (y in 0 until scaledBitmap.height) {
+            val pixel = scaledBitmap.getPixel(x, y)
+            val r = android.graphics.Color.red(pixel)
+            val g = android.graphics.Color.green(pixel)
+            val b = android.graphics.Color.blue(pixel)
+            
+            val l = 0.299f * r + 0.587f * g + 0.114f * b
+            val maxColor = maxOf(r, maxOf(g, b))
+            val minColor = minOf(r, minOf(g, b))
+            
+            val v = maxColor
+            val s = if (v == 0) 0f else (v - minColor).toFloat() / v
+            
+            // V < 130 拦截：发光的光源必须自己是明亮的
+            if (v < 130) continue
+            
+            // S < 0.5 拦截：过滤偏灰的杂色泥巴色
+            if (s < 0.5f) continue
+            
+            // 针对性补丁：拦截暗淡的土味黄棕色
+            if (r > g && b < 60 && v < 220) continue
+            
+            val c = (maxColor - minColor).toFloat()
+            val score = l * c
+            if (score > maxScore) {
+                maxScore = score
+                bestColor = pixel
+            }
+        }
+    }
+    
+    // 如果所有像素都被剔除了（比如纯黑白封面），退化为单纯找最亮的像素
+    if (maxScore == -1f) {
+        for (x in 0 until scaledBitmap.width) {
+            for (y in 0 until scaledBitmap.height) {
+                val pixel = scaledBitmap.getPixel(x, y)
+                val r = android.graphics.Color.red(pixel)
+                val g = android.graphics.Color.green(pixel)
+                val b = android.graphics.Color.blue(pixel)
+                val l = 0.299f * r + 0.587f * g + 0.114f * b
+                if (l > maxScore) {
+                    maxScore = l
+                    bestColor = pixel
+                }
+            }
+        }
+    }
+    
+    // 终极屎色拦截器：如果算出来的颜色依然是“屎色”（土褐、暗黄、泥巴灰），直接强行替换为纯白色
+    val finalR = android.graphics.Color.red(bestColor)
+    val finalG = android.graphics.Color.green(bestColor)
+    val finalB = android.graphics.Color.blue(bestColor)
+    val finalV = maxOf(finalR, maxOf(finalG, finalB))
+    val finalMin = minOf(finalR, minOf(finalG, finalB))
+    val finalS = if (finalV == 0) 0f else (finalV - finalMin).toFloat() / finalV
+    
+    val isPoop = (finalR > finalG && finalG >= finalB && finalB < 100 && finalV < 220) || 
+                 (finalR > finalG && finalB < 80 && finalV < 210) ||
+                 (finalS < 0.5f && finalV < 180) ||
+                 (finalV < 130) // 太暗的也直接当黑/白色处理（发光本身不能是暗色）
+                 
+    if (isPoop) {
+        bestColor = android.graphics.Color.WHITE
+    }
+    
+    return androidx.compose.ui.graphics.Color(bestColor)
+}
+
+/**
  * 平板设置面板全部设置项登记表（分组 + 键名 + 代码默认值）。
  * 导出时逐项读取生效值，保证未动过的滑块也能按默认值导出。
  */
@@ -61,7 +141,9 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
     "封面发光" to listOf(
         LyricsSettingDef("glowBrightness", 0.09f),
         LyricsSettingDef("glowBreathFrequency", 0.5f),
-        LyricsSettingDef("glowScaleSize", 1.3f)
+        LyricsSettingDef("glowScaleSize", 1.3f),
+        LyricsSettingDef("rightEdgeGlowRadius", 98.0f),
+        LyricsSettingDef("beatGlowThreshold", 0.1f)
     ),
     "歌词动画" to listOf(
         LyricsSettingDef("verticalScrollSpeed", 0.5f),

@@ -76,6 +76,8 @@ import com.example.bna.ui.theme.TextSecondary
 import com.example.bna.ui.theme.TextTertiary
 import com.example.bna.viewmodel.LyricsViewModel
 
+sealed class BaseSettingItem
+
 data class SliderSettingItem(
     val label: String,
     val description: String,
@@ -83,12 +85,19 @@ data class SliderSettingItem(
     val onValueChange: (Float) -> Unit,
     val valueRange: ClosedFloatingPointRange<Float>,
     val steps: Int = 0
-)
+) : BaseSettingItem()
+
+data class SwitchSettingItem(
+    val label: String,
+    val description: String,
+    val checked: Boolean,
+    val onCheckedChange: (Boolean) -> Unit
+) : BaseSettingItem()
 
 data class SliderSettingSection(
     val title: String,
     val description: String,
-    val items: List<SliderSettingItem>
+    val items: List<BaseSettingItem>
 )
 
 @Composable
@@ -548,20 +557,57 @@ fun LyricsSettingsBottomSheet(
                         }
 
                         section.items.forEach { item ->
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(
-                                    text = item.description,
-                                    color = TextSecondary,
-                                    fontSize = 12.sp,
-                                    lineHeight = 18.sp
-                                )
-                                SettingSliderRow(
-                                    label = item.label,
-                                    value = item.value,
-                                    onValueChange = item.onValueChange,
-                                    valueRange = item.valueRange,
-                                    steps = item.steps
-                                )
+                            when (item) {
+                                is SliderSettingItem -> {
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            text = item.description,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp,
+                                            lineHeight = 18.sp
+                                        )
+                                        SettingSliderRow(
+                                            label = item.label,
+                                            value = item.value,
+                                            onValueChange = item.onValueChange,
+                                            valueRange = item.valueRange,
+                                            steps = item.steps
+                                        )
+                                    }
+                                }
+                                is SwitchSettingItem -> {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.weight(1f).padding(end = 16.dp),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                text = item.label,
+                                                color = TextPrimary,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = item.description,
+                                                color = TextSecondary,
+                                                fontSize = 12.sp,
+                                                lineHeight = 18.sp
+                                            )
+                                        }
+                                        Switch(
+                                            checked = item.checked,
+                                            onCheckedChange = item.onCheckedChange,
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = NeteaseRed,
+                                                checkedTrackColor = NeteaseRed.copy(alpha = 0.5f)
+                                            )
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

@@ -91,6 +91,9 @@ fun TabletLyricsLayout(
     var glowBrightness by rememberFloatPreference("glowBrightness", 0.09f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
+    var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", true)
+    var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 98.0f)
+    var beatGlowThreshold by rememberFloatPreference("beatGlowThreshold", 0.1f)
 
     // 小尺寸平板适配：所有外边距、列间距按屏幕尺寸等比收缩，限制在原设计值以内
     val configuration = LocalConfiguration.current
@@ -100,12 +103,71 @@ fun TabletLyricsLayout(
     val outerVerticalPadding = (screenHeight * 0.06f).coerceIn(10.dp, 56.dp)
     val columnSpacing = (screenWidth * 0.07f).coerceIn(16.dp, 80.dp)
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = outerHorizontalPadding, vertical = outerVerticalPadding),
-        horizontalArrangement = Arrangement.spacedBy(columnSpacing)
-    ) {
+    val context = LocalContext.current
+    var dominantColor by remember { mutableStateOf(Color(0xFF00BFFF)) }
+    LaunchedEffect(song.albumCoverUrl) {
+        if (song.albumCoverUrl.isNotEmpty()) {
+            try {
+                val loader = ImageLoader(context)
+                val request = ImageRequest.Builder(context)
+                    .data(song.albumCoverUrl + "?param=200y200")
+                    .allowHardware(false)
+                    .build()
+                val result = loader.execute(request)
+                if (result is SuccessResult) {
+                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                    if (bitmap != null) {
+                        dominantColor = extractVibrantColor(bitmap)
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        var audioAmplitude by remember { mutableStateOf(0f) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                audioAmplitude = com.example.bna.player.MusicPlayer.suiXinChangProcessor.currentAmplitude
+                kotlinx.coroutines.delay(32)
+            }
+        }
+        val targetEdgeAlpha = if (audioAmplitude > beatGlowThreshold) 0.2f + audioAmplitude * 0.8f else 0f
+        val animatedEdgeAlpha by androidx.compose.animation.core.animateFloatAsState(
+            targetValue = targetEdgeAlpha,
+            animationSpec = androidx.compose.animation.core.spring(
+                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+                stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+            ),
+            label = "edgeAlphaAnim"
+        )
+        if (enableEdgeGlow && rightEdgeGlowRadius > 0f) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(animatedEdgeAlpha)
+                    .blur(30.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            ) {
+                val w = size.width
+                val h = size.height
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(w, 0f)
+                    quadraticTo(w - 2 * rightEdgeGlowRadius, h / 2f, w, h)
+                    close()
+                }
+                drawPath(
+                    path = path,
+                    color = dominantColor.copy(alpha = 0.5f)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = outerHorizontalPadding, vertical = outerVerticalPadding),
+            horizontalArrangement = Arrangement.spacedBy(columnSpacing)
+        ) {
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -150,48 +212,20 @@ fun TabletLyricsLayout(
                 Spacer(modifier = Modifier.height(28.dp * uiScale * spacerScale))
 
             // 封面吃掉的高度从元素间距里借用，列宽跟随封面实际边长，控件保持与封面同宽
-                val context = LocalContext.current
-
-                // 从封面提取主色调
-                var dominantColor by remember { mutableStateOf(NeteaseRed) }
-                LaunchedEffect(song.albumCoverUrl) {
-                    if (song.albumCoverUrl.isNotEmpty()) {
-                        try {
-                            val loader = ImageLoader(context)
-                            val request = ImageRequest.Builder(context)
-                                .data(song.albumCoverUrl + "?param=200y200")
-                                .allowHardware(false)
-                                .build()
-                            val result = loader.execute(request)
-                            if (result is SuccessResult) {
-                                val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
-                                if (bitmap != null) {
-                                    val palette = Palette.from(bitmap).generate()
-                                    val extracted = palette.vibrantSwatch?.rgb
-                                        ?: palette.dominantSwatch?.rgb
-                                        ?: palette.mutedSwatch?.rgb
-                                    if (extracted != null) {
-                                        dominantColor = Color(extracted)
-                                    }
-                                }
-                            }
-                        } catch (_: Exception) { }
-                    }
-                }
 
                 // 呼吸动画
-                val breathAnim = remember { Animatable(1.0f) }
+                val breathAnim = remember { androidx.compose.animation.core.Animatable(1.0f) }
                 LaunchedEffect(glowBreathFrequency) {
                     if (glowBreathFrequency > 0.01f) {
                         val periodMs = (1000f / glowBreathFrequency).toInt().coerceAtLeast(200)
                         while (true) {
                             breathAnim.animateTo(
                                 targetValue = 0.45f,
-                                animationSpec = tween(durationMillis = periodMs)
+                                animationSpec = androidx.compose.animation.core.tween(durationMillis = periodMs)
                             )
                             breathAnim.animateTo(
                                 targetValue = 1.0f,
-                                animationSpec = tween(durationMillis = periodMs)
+                                animationSpec = androidx.compose.animation.core.tween(durationMillis = periodMs)
                             )
                         }
                     } else {
@@ -332,6 +366,7 @@ fun TabletLyricsLayout(
             }
         }
     }
+    }
 
     if (showSettings) {
         LyricsSettingsBottomSheet(
@@ -348,6 +383,15 @@ fun TabletLyricsLayout(
                         SliderSettingItem("发光亮度", "控制封面光晕的整体亮度，为 0 时关闭发光。", glowBrightness, { glowBrightness = it }, 0f..1.0f, 10),
                         SliderSettingItem("发光大小", "控制封面下方发光图层的缩放比例。", glowScaleSize, { glowScaleSize = it }, 1.0f..3.0f, 20),
                         SliderSettingItem("呼吸频率", "发光明暗交替的速度，为 0 时光晕保持静态。", glowBreathFrequency, { glowBreathFrequency = it }, 0f..5.0f, 10)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "边缘发光",
+                    description = "屏幕边缘的发光效果。",
+                    items = listOf(
+                        SwitchSettingItem("启用发光", "开启或关闭屏幕边缘的随低音发光效果。", enableEdgeGlow, { enableEdgeGlow = it }),
+                        SliderSettingItem("右边缘发光", "控制右侧边缘发光的半径。无论怎么调整，发光始终经过右侧上下两点。", rightEdgeGlowRadius, { rightEdgeGlowRadius = it }, 0f..500f, 50),
+                        SliderSettingItem("发光鼓点阈值", "过滤微弱振幅，仅当低音强度高于此值时发光。", beatGlowThreshold, { beatGlowThreshold = it }, 0f..1.0f, 50)
                     )
                 ),
                 SliderSettingSection(
