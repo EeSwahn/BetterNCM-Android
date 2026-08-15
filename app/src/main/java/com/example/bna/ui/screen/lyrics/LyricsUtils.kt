@@ -143,7 +143,8 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("glowBreathFrequency", 0.5f),
         LyricsSettingDef("glowScaleSize", 1.3f),
         LyricsSettingDef("rightEdgeGlowRadius", 98.0f),
-        LyricsSettingDef("beatGlowThreshold", 0.1f)
+        LyricsSettingDef("beatGlowThreshold", 0.1f),
+        LyricsSettingDef("beatGlowDelayMs", 352.9f)
     ),
     "歌词动画" to listOf(
         LyricsSettingDef("verticalScrollSpeed", 0.5f),

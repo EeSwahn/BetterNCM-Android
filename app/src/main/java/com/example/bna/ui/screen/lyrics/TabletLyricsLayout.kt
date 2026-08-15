@@ -94,6 +94,7 @@ fun TabletLyricsLayout(
     var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", true)
     var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 98.0f)
     var beatGlowThreshold by rememberFloatPreference("beatGlowThreshold", 0.1f)
+    var beatGlowDelayMs by rememberFloatPreference("beatGlowDelayMs", 352.9f)
 
     // 小尺寸平板适配：所有外边距、列间距按屏幕尺寸等比收缩，限制在原设计值以内
     val configuration = LocalConfiguration.current
@@ -127,9 +128,18 @@ fun TabletLyricsLayout(
     Box(modifier = Modifier.fillMaxSize()) {
         var audioAmplitude by remember { mutableStateOf(0f) }
         LaunchedEffect(Unit) {
+            val history = mutableListOf<Pair<Long, Float>>()
             while (true) {
-                audioAmplitude = com.example.bna.player.MusicPlayer.suiXinChangProcessor.currentAmplitude
-                kotlinx.coroutines.delay(32)
+                val now = System.currentTimeMillis()
+                val currentAmp = com.example.bna.player.MusicPlayer.suiXinChangProcessor.currentAmplitude
+                history.add(now to currentAmp)
+                history.removeAll { now - it.first > 2000 } // Keep up to 2 seconds of history
+                
+                val targetTime = now - beatGlowDelayMs.toLong()
+                val delayedAmp = history.minByOrNull { Math.abs(it.first - targetTime) }?.second ?: currentAmp
+                
+                audioAmplitude = delayedAmp
+                kotlinx.coroutines.delay(16) // use 16ms for smooth 60fps polling
             }
         }
         val targetEdgeAlpha = if (audioAmplitude > beatGlowThreshold) 0.2f + audioAmplitude * 0.8f else 0f
@@ -391,7 +401,8 @@ fun TabletLyricsLayout(
                     items = listOf(
                         SwitchSettingItem("启用发光", "开启或关闭屏幕边缘的随低音发光效果。", enableEdgeGlow, { enableEdgeGlow = it }),
                         SliderSettingItem("右边缘发光", "控制右侧边缘发光的半径。无论怎么调整，发光始终经过右侧上下两点。", rightEdgeGlowRadius, { rightEdgeGlowRadius = it }, 0f..500f, 50),
-                        SliderSettingItem("发光鼓点阈值", "过滤微弱振幅，仅当低音强度高于此值时发光。", beatGlowThreshold, { beatGlowThreshold = it }, 0f..1.0f, 50)
+                        SliderSettingItem("发光鼓点阈值", "过滤微弱振幅，仅当低音强度高于此值时发光。", beatGlowThreshold, { beatGlowThreshold = it }, 0f..1.0f, 50),
+                        SliderSettingItem("发光延迟补偿", "如果发光比声音早，可增加此延迟让光晕踩准鼓点。", beatGlowDelayMs, { beatGlowDelayMs = it }, 0f..1000f, 50)
                     )
                 ),
                 SliderSettingSection(
