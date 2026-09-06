@@ -21,14 +21,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -285,9 +288,79 @@ private fun onValueChangeWithShowSlider(
     showSliderAction()
 }
 
+/** 更矮、更精致的细滑杆：透明 Slider 负责输入与步进，视觉上只画细轨道+填充+圆点 */
+@Composable
+private fun CompactSettingsSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0
+) {
+    val start = valueRange.start
+    val end = valueRange.endInclusive
+    val span = if (end > start) (end - start) else 1f
+    val frac = (((value - start) / span).coerceIn(0f, 1f))
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(26.dp)
+    ) {
+        val trackWidth = maxWidth
+        val thumb = 16.dp
+        // 底轨
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .align(Alignment.Center)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.14f))
+        )
+        // 已填充部分
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(frac)
+                .height(4.dp)
+                .align(Alignment.CenterStart)
+                .clip(RoundedCornerShape(2.dp))
+                .background(NeteaseRed)
+        )
+        // 滑块圆点
+        Box(
+            modifier = Modifier
+                .size(thumb)
+                .offset(x = (trackWidth - thumb) * frac)
+                .align(Alignment.CenterStart)
+                .clip(CircleShape)
+                .background(Color.White)
+        )
+        // 透明滑杆：承接拖动/步进，视觉上不显示
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = steps,
+            modifier = Modifier.fillMaxSize(),
+            colors = SliderDefaults.colors(
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent,
+                thumbColor = Color.Transparent,
+                disabledThumbColor = Color.Transparent,
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent,
+                disabledActiveTrackColor = Color.Transparent,
+                disabledInactiveTrackColor = Color.Transparent,
+                disabledActiveTickColor = Color.Transparent,
+                disabledInactiveTickColor = Color.Transparent
+            )
+        )
+    }
+}
+
 @Composable
 fun SettingSliderRow(
     label: String,
+    description: String = "",
     value: Float,
     onValueChange: (Float) -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
@@ -301,15 +374,8 @@ fun SettingSliderRow(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(Color.White.copy(alpha = 0.035f))
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.06f),
-                shape = RoundedCornerShape(18.dp)
-            )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -319,8 +385,8 @@ fun SettingSliderRow(
             Text(
                 text = label,
                 color = TextPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium
             )
             Text(
                 text = displayText,
@@ -345,47 +411,28 @@ fun SettingSliderRow(
                         color = NeteaseRed.copy(alpha = 0.22f),
                         shape = RoundedCornerShape(999.dp)
                     )
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 textAlign = TextAlign.Center
             )
         }
 
-        Slider(
+        if (description.isNotBlank()) {
+            Text(
+                text = description,
+                color = TextSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+
+        CompactSettingsSlider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
-            steps = steps,
-            modifier = Modifier.fillMaxWidth(),
-            colors = SliderDefaults.colors(
-                activeTrackColor = NeteaseRed,
-                thumbColor = Color.White,
-                inactiveTrackColor = Color.White.copy(alpha = 0.12f),
-                activeTickColor = NeteaseRed,
-                inactiveTickColor = Color.White.copy(alpha = 0.16f)
-            )
+            steps = steps
         )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = formatSliderEdgeValue(label, valueRange.start),
-                color = TextTertiary,
-                fontSize = 12.sp
-            )
-            Text(
-                text = "点击数值可精确输入",
-                color = TextTertiary,
-                fontSize = 12.sp
-            )
-            Text(
-                text = formatSliderEdgeValue(label, valueRange.endInclusive),
-                color = TextTertiary,
-                fontSize = 12.sp
-            )
-        }
     }
 
     if (showDialog) {
@@ -478,6 +525,7 @@ fun LyricsSettingsBottomSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .graphicsLayer { translationY = dragPx }
+                .heightIn(max = if (isPhone) 620.dp else 760.dp)
                 .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 .background(DarkBackground)
                 .navigationBarsPadding()
@@ -542,7 +590,7 @@ fun LyricsSettingsBottomSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight()
+                    .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
@@ -646,25 +694,18 @@ fun LyricsSettingsBottomSheet(
                         }
 
                         AnimatedVisibility(visible = expanded) {
-                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         section.items.forEach { item ->
                             when (item) {
                                 is SliderSettingItem -> {
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            text = item.description,
-                                            color = TextSecondary,
-                                            fontSize = 12.sp,
-                                            lineHeight = 18.sp
-                                        )
-                                        SettingSliderRow(
-                                            label = item.label,
-                                            value = item.value,
-                                            onValueChange = item.onValueChange,
-                                            valueRange = item.valueRange,
-                                            steps = item.steps
-                                        )
-                                    }
+                                    SettingSliderRow(
+                                        label = item.label,
+                                        description = item.description,
+                                        value = item.value,
+                                        onValueChange = item.onValueChange,
+                                        valueRange = item.valueRange,
+                                        steps = item.steps
+                                    )
                                 }
                                 is SwitchSettingItem -> {
                                     Row(

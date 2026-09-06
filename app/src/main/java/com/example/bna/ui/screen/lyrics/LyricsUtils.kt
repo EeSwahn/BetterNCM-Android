@@ -167,25 +167,25 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("lyricBlurIntensity", 0.48f)
     ),
     "按钮调节" to listOf(
-        LyricsSettingDef("playbackButtonSizeRatio", 0.6888889f),
-        LyricsSettingDef("playbackButtonSpacingDp", 0f)
+        LyricsSettingDef("playbackButtonSizeRatio", 0.7777778f),
+        LyricsSettingDef("playbackButtonSpacingDp", 60.0f)
     ),
     "左侧布局校准" to listOf(
-        LyricsSettingDef("coverSizeRatio", 1.5f),
+        LyricsSettingDef("coverSizeRatio", 1.4090909f),
         LyricsSettingDef("headerPosX", 0f),
-        LyricsSettingDef("headerPosY", 6.422648f),
+        LyricsSettingDef("headerPosY", 1.4884834f),
         LyricsSettingDef("coverPosX", 0f),
-        LyricsSettingDef("coverPosY", 9.021849f),
-        LyricsSettingDef("audioSpecPosX", 0f),
-        LyricsSettingDef("audioSpecPosY", 10.362571f),
-        LyricsSettingDef("playbackPosX", 0f),
-        LyricsSettingDef("playbackPosY", 8.235011f)
+        LyricsSettingDef("coverPosY", 4.578991f),
+        LyricsSettingDef("audioSpecPosX", -0.27659988f),
+        LyricsSettingDef("audioSpecPosY", 4.2480392f),
+        LyricsSettingDef("playbackPosX", -0.16628647f),
+        LyricsSettingDef("playbackPosY", -0.49563217f)
     ),
     "右侧布局校准" to listOf(
         LyricsSettingDef("lyricsPanelPosX", 0f),
         LyricsSettingDef("lyricsPanelPosY", 0f),
         LyricsSettingDef("progressPosX", 0f),
-        LyricsSettingDef("progressPosY", 9.495790f),
+        LyricsSettingDef("progressPosY", 3.2551765f),
         LyricsSettingDef("progressBarWidthRatio", 1.2444445f)
     )
 )
@@ -193,7 +193,8 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
 val tabletLyricsBooleanSettings: List<Pair<String, Boolean>> = listOf(
     "enableWordByWord" to true,
     "showLyricsTranslation" to true,
-    "enableLyricBlur" to true
+    "enableLyricBlur" to true,
+    "enableEdgeGlow" to false
 )
 
 /**
