@@ -69,7 +69,6 @@ dependencies {
 
     // ExoPlayer (Media3)
     implementation(libs.media3.exoplayer)
-    implementation(libs.media3.ui)
     implementation(libs.media3.session)
 
     // ViewModel
@@ -77,9 +76,6 @@ dependencies {
 
     // ZXing (QR code generation)
     implementation(libs.zxing.core)
-
-    // Palette (cover color extraction)
-    implementation(libs.androidx.palette)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

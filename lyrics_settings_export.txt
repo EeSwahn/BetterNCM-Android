@@ -1,0 +1,44 @@
+# BNA 歌词界面设置导出（平板）
+# 导出时间: 2026-08-13 18:12:35
+# 标注 (默认) 的为未手动调节、使用代码默认值的项
+enableWordByWord = true  (默认)
+
+[歌词动画]
+verticalScrollSpeed = 0.5  (默认)
+scaleAnimationSpeed = 0.5  (默认)
+activeLyricSizeRatio = 0.7  (默认)
+baseFontSizeRatio = 1.3  (默认)
+lineSpacingRatio = 0.5
+
+[逐字细节]
+yrcFloatSpeed = 2.0  (默认)
+yrcFloatIntensity = 3.92  (默认)
+wordTimingOffsetMs = 0.0  (默认)
+wordScaleSpeed = 0.27  (默认)
+wordScaleSize = 1.0  (默认)
+
+[按钮调节]
+playbackButtonSizeRatio = 0.6888889
+playbackButtonSpacingDp = 0.0  (默认)
+bottomButtonSizeRatio = 0.6
+bottomButtonSpacingDp = 0.0
+
+[左侧布局校准]
+coverSizeRatio = 1.5
+headerOffsetX = 0.0  (默认)
+headerOffsetY = 35.966827
+coverOffsetX = 0.0  (默认)
+coverOffsetY = 50.522354
+audioSpecOffsetX = 0.0  (默认)
+audioSpecOffsetY = 58.030396
+playbackOffsetX = 0.0  (默认)
+playbackOffsetY = 46.11606
+bottomOffsetX = 0.0  (默认)
+bottomOffsetY = 40.814377
+
+[右侧布局校准]
+lyricsPanelOffsetX = 0.0  (默认)
+lyricsPanelOffsetY = 0.0  (默认)
+progressBarOffsetX = 0.0
+progressBarOffsetY = 53.176422
+progressBarWidthRatio = 1.2444445

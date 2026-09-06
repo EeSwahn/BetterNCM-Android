@@ -10,11 +10,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.example.bna.player.MusicPlayer
 import com.example.bna.ui.animation.*
 import com.example.bna.ui.theme.*
@@ -68,7 +65,7 @@ fun LyricsScreen(
             )
     ) {
         if (song != null) {
-            AlbumCoverBackground(
+            FlowingLightBackground(
                 coverUrl = song.albumCoverUrl
             )
         }
@@ -90,42 +87,5 @@ fun LyricsScreen(
                 animationConfig = animationConfig
             )
         }
-    }
-}
-
-@Composable
-private fun AlbumCoverBackground(
-    coverUrl: String
-) {
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        if (coverUrl.isNotEmpty()) {
-            AsyncImage(
-                model = coverUrl + "?param=800y800",
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(
-                        radius = 100.dp,
-                        edgeTreatment = BlurredEdgeTreatment.Unbounded
-                    )
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.7f),
-                            Color.Black.copy(alpha = 0.85f)
-                        )
-                    )
-                )
-        )
     }
 }

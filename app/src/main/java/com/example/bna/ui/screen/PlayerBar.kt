@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.res.painterResource
+import com.example.bna.R
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -155,7 +157,9 @@ private fun PlayerBarContent(state: PlayerState, onClick: () -> Unit) {
                         .background(NeteaseRed.copy(alpha = 0.15f))
                 ) {
                     Icon(
-                        imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        painter = painterResource(
+                            if (state.isPlaying) R.drawable.salt_ic_pause_btn else R.drawable.salt_ic_play_btn
+                        ),
                         contentDescription = if (state.isPlaying) "暂停" else "播放",
                         tint = NeteaseRed,
                         modifier = Modifier.size(26.dp)

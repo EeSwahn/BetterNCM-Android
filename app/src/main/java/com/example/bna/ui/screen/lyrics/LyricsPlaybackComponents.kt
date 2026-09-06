@@ -24,15 +24,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.ui.res.painterResource
+import com.example.bna.R
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -222,7 +221,7 @@ fun PlaybackButtonsOnly(
         ) {
             IconButton(onClick = { MusicPlayer.playPrevious() }, modifier = Modifier.size(sideSize)) {
                 Icon(
-                    imageVector = Icons.Default.SkipPrevious,
+                    painter = painterResource(R.drawable.salt_ic_skip_previous),
                     contentDescription = "上一首",
                     tint = TextPrimary,
                     modifier = Modifier.size(sideIcon)
@@ -231,7 +230,9 @@ fun PlaybackButtonsOnly(
 
             IconButton(onClick = { MusicPlayer.togglePlayPause() }, modifier = Modifier.size(playSize)) {
                 Icon(
-                    imageVector = if (playerState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    painter = painterResource(
+                        if (playerState.isPlaying) R.drawable.salt_ic_pause_btn else R.drawable.salt_ic_play_btn
+                    ),
                     contentDescription = if (playerState.isPlaying) "暂停" else "播放",
                     tint = Color.White,
                     modifier = Modifier.size(playIcon)
@@ -240,7 +241,7 @@ fun PlaybackButtonsOnly(
 
             IconButton(onClick = { MusicPlayer.playNext() }, modifier = Modifier.size(sideSize)) {
                 Icon(
-                    imageVector = Icons.Default.SkipNext,
+                    painter = painterResource(R.drawable.salt_ic_skip_next),
                     contentDescription = "下一首",
                     tint = Color.White,
                     modifier = Modifier.size(sideIcon)
