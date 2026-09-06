@@ -172,20 +172,20 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
     ),
     "左侧布局校准" to listOf(
         LyricsSettingDef("coverSizeRatio", 1.5f),
-        LyricsSettingDef("headerOffsetX", 0f),
-        LyricsSettingDef("headerOffsetY", 35.966827f),
-        LyricsSettingDef("coverOffsetX", 0f),
-        LyricsSettingDef("coverOffsetY", 50.522354f),
-        LyricsSettingDef("audioSpecOffsetX", 0f),
-        LyricsSettingDef("audioSpecOffsetY", 58.030396f),
-        LyricsSettingDef("playbackOffsetX", 0f),
-        LyricsSettingDef("playbackOffsetY", 46.11606f)
+        LyricsSettingDef("headerPosX", 0f),
+        LyricsSettingDef("headerPosY", 6.422648f),
+        LyricsSettingDef("coverPosX", 0f),
+        LyricsSettingDef("coverPosY", 9.021849f),
+        LyricsSettingDef("audioSpecPosX", 0f),
+        LyricsSettingDef("audioSpecPosY", 10.362571f),
+        LyricsSettingDef("playbackPosX", 0f),
+        LyricsSettingDef("playbackPosY", 8.235011f)
     ),
     "右侧布局校准" to listOf(
-        LyricsSettingDef("lyricsPanelOffsetX", 0f),
-        LyricsSettingDef("lyricsPanelOffsetY", 0f),
-        LyricsSettingDef("progressBarOffsetX", 0f),
-        LyricsSettingDef("progressBarOffsetY", 53.176422f),
+        LyricsSettingDef("lyricsPanelPosX", 0f),
+        LyricsSettingDef("lyricsPanelPosY", 0f),
+        LyricsSettingDef("progressPosX", 0f),
+        LyricsSettingDef("progressPosY", 9.495790f),
         LyricsSettingDef("progressBarWidthRatio", 1.2444445f)
     )
 )

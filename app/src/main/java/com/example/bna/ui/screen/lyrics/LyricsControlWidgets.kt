@@ -1,6 +1,7 @@
 package com.example.bna.ui.screen.lyrics
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,6 +12,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,7 +43,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -54,6 +57,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +67,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +75,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
+import androidx.activity.compose.BackHandler
 import com.example.bna.ui.theme.DarkBackground
 import com.example.bna.ui.theme.DarkCard
 import com.example.bna.ui.theme.NeteaseRed
@@ -77,6 +83,7 @@ import com.example.bna.ui.theme.TextPrimary
 import com.example.bna.ui.theme.TextSecondary
 import com.example.bna.ui.theme.TextTertiary
 import com.example.bna.viewmodel.LyricsViewModel
+import kotlinx.coroutines.launch
 
 sealed class BaseSettingItem
 
@@ -435,18 +442,70 @@ fun LyricsSettingsBottomSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = DarkBackground,
-        contentColor = TextPrimary
-    ) {
+    BackHandler { onDismiss() }
+
+    // 自定义底部浮层：不用官方 ModalBottomSheet，避免滚动内容时被误收起。
+    val density = LocalDensity.current
+    var dragPx by remember { mutableStateOf(0f) }
+    val dragScope = rememberCoroutineScope()
+    val dismissPx = with(density) { 260.dp.toPx() }
+    fun finishDrag() {
+        dragScope.launch {
+            if (dragPx >= dismissPx) {
+                onDismiss()
+            } else {
+                val a = Animatable(dragPx)
+                a.animateTo(0f, animationSpec = tween(200)) { dragPx = value }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 遮罩：点按关闭
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onDismiss() }
+        )
+
+        // 底部面板：顶部把手可跟手下拖收起；内容区自由滚动，绝不因滚动误收起
         Column(
             modifier = Modifier
+                .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .heightIn(max = if (isPhone) 620.dp else 760.dp)
+                .graphicsLayer { translationY = dragPx }
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .background(DarkBackground)
+                .navigationBarsPadding()
                 .padding(horizontal = if (isPhone) 20.dp else 28.dp)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 20.dp)
         ) {
+            // 顶部把手
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { _, dy -> dragPx = (dragPx + dy).coerceAtLeast(0f) },
+                            onDragEnd = { finishDrag() },
+                            onDragCancel = { finishDrag() }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(44.dp)
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.3f))
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

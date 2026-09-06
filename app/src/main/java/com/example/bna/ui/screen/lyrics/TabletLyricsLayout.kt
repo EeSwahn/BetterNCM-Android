@@ -90,19 +90,19 @@ fun TabletLyricsLayout(
         snapClosed()
     }
 
-    var headerOffsetX by rememberFloatPreference("headerOffsetX", 0f)
-    var headerOffsetY by rememberFloatPreference("headerOffsetY", 35.966827f)
-    var coverOffsetX by rememberFloatPreference("coverOffsetX", 0f)
-    var coverOffsetY by rememberFloatPreference("coverOffsetY", 50.522354f)
-    var audioSpecOffsetX by rememberFloatPreference("audioSpecOffsetX", 0f)
-    var audioSpecOffsetY by rememberFloatPreference("audioSpecOffsetY", 58.030396f)
-    var playbackOffsetX by rememberFloatPreference("playbackOffsetX", 0f)
-    var playbackOffsetY by rememberFloatPreference("playbackOffsetY", 46.11606f)
-    var lyricsPanelOffsetX by rememberFloatPreference("lyricsPanelOffsetX", 0f)
-    var lyricsPanelOffsetY by rememberFloatPreference("lyricsPanelOffsetY", 0f)
-    
-    var progressBarOffsetX by rememberFloatPreference("progressBarOffsetX", 0f)
-    var progressBarOffsetY by rememberFloatPreference("progressBarOffsetY", 53.176422f)
+    // ---- 位置调节：以「占所在列宽/高的百分比」表示偏移，X 以列宽为基准、Y 以列高为基准 ----
+    var headerPosX by rememberFloatPreference("headerPosX", 0f)
+    var headerPosY by rememberFloatPreference("headerPosY", 6.422648f)
+    var coverPosX by rememberFloatPreference("coverPosX", 0f)
+    var coverPosY by rememberFloatPreference("coverPosY", 9.021849f)
+    var audioSpecPosX by rememberFloatPreference("audioSpecPosX", 0f)
+    var audioSpecPosY by rememberFloatPreference("audioSpecPosY", 10.362571f)
+    var playbackPosX by rememberFloatPreference("playbackPosX", 0f)
+    var playbackPosY by rememberFloatPreference("playbackPosY", 8.235011f)
+    var lyricsPanelPosX by rememberFloatPreference("lyricsPanelPosX", 0f)
+    var lyricsPanelPosY by rememberFloatPreference("lyricsPanelPosY", 0f)
+    var progressPosX by rememberFloatPreference("progressPosX", 0f)
+    var progressPosY by rememberFloatPreference("progressPosY", 9.495790f)
     var progressBarWidthRatio by rememberFloatPreference("progressBarWidthRatio", 1.2444445f)
 
     var playbackButtonSizeRatio by rememberFloatPreference("playbackButtonSizeRatio", 0.6888889f)
@@ -219,6 +219,9 @@ fun TabletLyricsLayout(
         ) {
             // 以约 560dp 的左栏内容高度为基准做等比收缩，小屏上所有元素都能完整落位
             val uiScale = (maxHeight / 560.dp).coerceIn(0.45f, 1f)
+            // 百分比偏移的基准：本列宽 / 本列高
+            val colW = maxWidth
+            val colH = maxHeight
             val nonCoverHeight = 340.dp * uiScale
             val idealWidth = (minOf(maxWidth * 0.95f, maxHeight - nonCoverHeight).coerceAtLeast(88.dp) * coverSizeRatio)
                 .coerceIn(48.dp, maxWidth * 0.98f)
@@ -254,7 +257,7 @@ fun TabletLyricsLayout(
                     }
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().offset(x = (headerOffsetX * uiScale).dp, y = (headerOffsetY * uiScale).dp),
+                    modifier = Modifier.fillMaxWidth().offset(x = colW * (headerPosX / 100f), y = colH * (headerPosY / 100f)),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.Top
                 ) {
@@ -305,7 +308,7 @@ fun TabletLyricsLayout(
                 Box(
                     modifier = Modifier
                         .size(coverEdge)
-                        .offset(x = (coverOffsetX * uiScale).dp, y = (coverOffsetY * uiScale).dp),
+                        .offset(x = colW * (coverPosX / 100f), y = colH * (coverPosY / 100f)),
                     contentAlignment = Alignment.Center
                 ) {
                     // 发光层
@@ -371,15 +374,15 @@ fun TabletLyricsLayout(
                 
                 Spacer(modifier = Modifier.height(16.dp * uiScale * spacerScale))
                 
-                Text(text = "AudioTrack    FLAC 16 bits    48 kHz", color = TextTertiary, fontSize = (10f * uiScale).coerceAtLeast(8f).sp, modifier = Modifier.fillMaxWidth().offset(x = (audioSpecOffsetX * uiScale).dp, y = (audioSpecOffsetY * uiScale).dp), textAlign = TextAlign.Center)
+                Text(text = "AudioTrack    FLAC 16 bits    48 kHz", color = TextTertiary, fontSize = (10f * uiScale).coerceAtLeast(8f).sp, modifier = Modifier.fillMaxWidth().offset(x = colW * (audioSpecPosX / 100f), y = colH * (audioSpecPosY / 100f)), textAlign = TextAlign.Center)
                 
                 Spacer(modifier = Modifier.height(12.dp * uiScale * spacerScale))
                 
-                ProgressBarOnly(offsetX = progressBarOffsetX * uiScale, offsetY = progressBarOffsetY * uiScale, widthRatio = progressBarWidthRatio)
+                ProgressBarOnly(offsetX = (colW * (progressPosX / 100f)).value, offsetY = (colH * (progressPosY / 100f)).value, widthRatio = progressBarWidthRatio)
                 
                 Spacer(modifier = Modifier.height(24.dp * uiScale * spacerScale))
                 
-                Box(modifier = Modifier.offset(x = (playbackOffsetX * uiScale).dp, y = (playbackOffsetY * uiScale).dp)) {
+                Box(modifier = Modifier.offset(x = colW * (playbackPosX / 100f), y = colH * (playbackPosY / 100f))) {
                     PlaybackButtonsOnly(
                         isPhone = false,
                         scale = uiScale,
@@ -415,12 +418,12 @@ fun TabletLyricsLayout(
             }
         }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier.weight(1.2f).fillMaxHeight()
         ) {
             // 歌词面板占满整个右侧区域，底部出现界限与顶部消失界限到屏幕边缘距离相等；
             // 随心唱按钮悬浮于右下角原位置，不再挤压歌词区
-            Box(modifier = Modifier.fillMaxSize().offset(x = lyricsPanelOffsetX.dp, y = lyricsPanelOffsetY.dp)) {
+            Box(modifier = Modifier.fillMaxSize().offset(x = maxWidth * (lyricsPanelPosX / 100f), y = maxHeight * (lyricsPanelPosY / 100f))) {
                 LyricsPanel(
                     lyricsState = lyricsState,
                     lyricsViewModel = lyricsViewModel,
@@ -519,27 +522,27 @@ fun TabletLyricsLayout(
                 ),
                 SliderSettingSection(
                     title = "左侧布局校准",
-                    description = "主要用于校准标题、封面、音质信息和底部控制的相对位置。",
+                    description = "X/Y 以占所在列宽/列高的百分比来微调相对位置（0 为基准落位），不同屏幕下表现一致。",
                     items = listOf(
                         SliderSettingItem("封面大小", "整体缩放左侧封面，其他元素位置保持不变。", coverSizeRatio, { coverSizeRatio = it }, 0.5f..1.5f, 10),
-                        SliderSettingItem("标题X", "微调标题区的水平位置。", headerOffsetX, { headerOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("标题Y", "微调标题区的垂直位置。", headerOffsetY, { headerOffsetY = it }, -200f..200f, 0),
-                        SliderSettingItem("封面X", "微调封面的水平位置。", coverOffsetX, { coverOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("封面Y", "微调封面的垂直位置。", coverOffsetY, { coverOffsetY = it }, -200f..200f, 0),
-                        SliderSettingItem("音质X", "微调音质文本的水平位置。", audioSpecOffsetX, { audioSpecOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("音质Y", "微调音质文本的垂直位置。", audioSpecOffsetY, { audioSpecOffsetY = it }, -200f..200f, 0),
-                        SliderSettingItem("控制X", "微调播放控制区的水平位置。", playbackOffsetX, { playbackOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("控制Y", "微调播放控制区的垂直位置。", playbackOffsetY, { playbackOffsetY = it }, -200f..200f, 0)
+                        SliderSettingItem("标题X", "标题区相对列宽的水平百分比偏移。", headerPosX, { headerPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("标题Y", "标题区相对列高的垂直百分比偏移。", headerPosY, { headerPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("封面X", "封面相对列宽的水平百分比偏移。", coverPosX, { coverPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("封面Y", "封面相对列高的垂直百分比偏移。", coverPosY, { coverPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("音质X", "音质文本相对列宽的水平百分比偏移。", audioSpecPosX, { audioSpecPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("音质Y", "音质文本相对列高的垂直百分比偏移。", audioSpecPosY, { audioSpecPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("控制X", "播放控制区相对列宽的水平百分比偏移。", playbackPosX, { playbackPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("控制Y", "播放控制区相对列高的垂直百分比偏移。", playbackPosY, { playbackPosY = it }, -50f..50f, 0)
                     )
                 ),
                 SliderSettingSection(
                     title = "右侧布局校准",
-                    description = "专门调整歌词区和进度条在平板大屏里的落位。",
+                    description = "X/Y 以占所在列宽/列高的百分比来微调，适配不同平板比例。",
                     items = listOf(
-                        SliderSettingItem("歌词X", "微调右侧歌词面板的水平位置。", lyricsPanelOffsetX, { lyricsPanelOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("歌词Y", "微调右侧歌词面板的垂直位置。", lyricsPanelOffsetY, { lyricsPanelOffsetY = it }, -200f..200f, 0),
-                        SliderSettingItem("进度条X", "微调进度条的水平位置。", progressBarOffsetX, { progressBarOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("进度条Y", "微调进度条的垂直位置。", progressBarOffsetY, { progressBarOffsetY = it }, -200f..200f, 0),
+                        SliderSettingItem("歌词X", "歌词面板相对列宽的水平百分比偏移。", lyricsPanelPosX, { lyricsPanelPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("歌词Y", "歌词面板相对列高的垂直百分比偏移。", lyricsPanelPosY, { lyricsPanelPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("进度条X", "进度条相对列宽的水平百分比偏移。", progressPosX, { progressPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("进度条Y", "进度条相对列高的垂直百分比偏移。", progressPosY, { progressPosY = it }, -50f..50f, 0),
                         SliderSettingItem("进度条宽", "缩放进度条宽度，匹配不同平板比例。", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17)
                     )
                 ),
