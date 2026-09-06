@@ -168,9 +168,7 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
     ),
     "按钮调节" to listOf(
         LyricsSettingDef("playbackButtonSizeRatio", 0.6888889f),
-        LyricsSettingDef("playbackButtonSpacingDp", 0f),
-        LyricsSettingDef("bottomButtonSizeRatio", 0.6f),
-        LyricsSettingDef("bottomButtonSpacingDp", 0f)
+        LyricsSettingDef("playbackButtonSpacingDp", 0f)
     ),
     "左侧布局校准" to listOf(
         LyricsSettingDef("coverSizeRatio", 1.5f),
@@ -181,9 +179,7 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("audioSpecOffsetX", 0f),
         LyricsSettingDef("audioSpecOffsetY", 58.030396f),
         LyricsSettingDef("playbackOffsetX", 0f),
-        LyricsSettingDef("playbackOffsetY", 46.11606f),
-        LyricsSettingDef("bottomOffsetX", 0f),
-        LyricsSettingDef("bottomOffsetY", 40.814377f)
+        LyricsSettingDef("playbackOffsetY", 46.11606f)
     ),
     "右侧布局校准" to listOf(
         LyricsSettingDef("lyricsPanelOffsetX", 0f),

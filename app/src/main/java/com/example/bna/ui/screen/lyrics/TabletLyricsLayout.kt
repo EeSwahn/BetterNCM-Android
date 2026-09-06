@@ -98,8 +98,6 @@ fun TabletLyricsLayout(
     var audioSpecOffsetY by rememberFloatPreference("audioSpecOffsetY", 58.030396f)
     var playbackOffsetX by rememberFloatPreference("playbackOffsetX", 0f)
     var playbackOffsetY by rememberFloatPreference("playbackOffsetY", 46.11606f)
-    var bottomOffsetX by rememberFloatPreference("bottomOffsetX", 0f)
-    var bottomOffsetY by rememberFloatPreference("bottomOffsetY", 40.814377f)
     var lyricsPanelOffsetX by rememberFloatPreference("lyricsPanelOffsetX", 0f)
     var lyricsPanelOffsetY by rememberFloatPreference("lyricsPanelOffsetY", 0f)
     
@@ -109,8 +107,6 @@ fun TabletLyricsLayout(
 
     var playbackButtonSizeRatio by rememberFloatPreference("playbackButtonSizeRatio", 0.6888889f)
     var playbackButtonSpacingDp by rememberFloatPreference("playbackButtonSpacingDp", 0f)
-    var bottomButtonSizeRatio by rememberFloatPreference("bottomButtonSizeRatio", 0.6f)
-    var bottomButtonSpacingDp by rememberFloatPreference("bottomButtonSpacingDp", 0f)
     var coverSizeRatio by rememberFloatPreference("coverSizeRatio", 1.5f)
 
     var enableWordByWord by rememberBooleanPreference("enableWordByWord", true)
@@ -234,7 +230,6 @@ fun TabletLyricsLayout(
                 16.dp +                                            // 音质文本
                 44.dp +                                            // 进度条 + 时间
                 76.dp * uiScale * playbackButtonSizeRatio +        // 播放按钮
-                (52.dp * bottomButtonSizeRatio + 16.dp) * uiScale +// 底部按钮
                 28.dp                                              // 安全余量
             val coverCapByHeight = (maxHeight - estimatedFixedHeight - 24.dp * uiScale).coerceAtLeast(48.dp)
             val coverEdge = minOf(idealWidth, coverCapByHeight)
@@ -516,12 +511,10 @@ fun TabletLyricsLayout(
                 ),
                 SliderSettingSection(
                     title = "按钮调节",
-                    description = "调整播放控制和底部动作按钮的大小与间距，间距为 0 时按布局自动分配。",
+                    description = "调整播放控制按钮的大小与间距，间距为 0 时按布局自动分配。",
                     items = listOf(
                         SliderSettingItem("播放按钮大小", "整体缩放上一首、播放、下一首三个按钮。", playbackButtonSizeRatio, { playbackButtonSizeRatio = it }, 0.6f..1.4f, 8),
-                        SliderSettingItem("播放按钮间距", "三个播放按钮之间的左右间距，0 表示按屏幕自适应。", playbackButtonSpacingDp, { playbackButtonSpacingDp = it }, 0f..60f, 12),
-                        SliderSettingItem("底部按钮大小", "整体缩放底部一排动作按钮。", bottomButtonSizeRatio, { bottomButtonSizeRatio = it }, 0.6f..1.4f, 8),
-                        SliderSettingItem("底部按钮间距", "底部按钮之间的左右间距，0 表示自动均分整行。", bottomButtonSpacingDp, { bottomButtonSpacingDp = it }, 0f..48f, 12)
+                        SliderSettingItem("播放按钮间距", "三个播放按钮之间的左右间距，0 表示按屏幕自适应。", playbackButtonSpacingDp, { playbackButtonSpacingDp = it }, 0f..60f, 12)
                     )
                 ),
                 SliderSettingSection(
@@ -536,9 +529,7 @@ fun TabletLyricsLayout(
                         SliderSettingItem("音质X", "微调音质文本的水平位置。", audioSpecOffsetX, { audioSpecOffsetX = it }, -200f..200f, 0),
                         SliderSettingItem("音质Y", "微调音质文本的垂直位置。", audioSpecOffsetY, { audioSpecOffsetY = it }, -200f..200f, 0),
                         SliderSettingItem("控制X", "微调播放控制区的水平位置。", playbackOffsetX, { playbackOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("控制Y", "微调播放控制区的垂直位置。", playbackOffsetY, { playbackOffsetY = it }, -200f..200f, 0),
-                        SliderSettingItem("底部X", "微调底部动作按钮的水平位置。", bottomOffsetX, { bottomOffsetX = it }, -200f..200f, 0),
-                        SliderSettingItem("底部Y", "微调底部动作按钮的垂直位置。", bottomOffsetY, { bottomOffsetY = it }, -200f..200f, 0)
+                        SliderSettingItem("控制Y", "微调播放控制区的垂直位置。", playbackOffsetY, { playbackOffsetY = it }, -200f..200f, 0)
                     )
                 ),
                 SliderSettingSection(

@@ -44,7 +44,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +66,6 @@ import com.example.bna.ui.theme.TextPrimary
 import com.example.bna.ui.theme.TextSecondary
 import com.example.bna.ui.theme.TextTertiary
 import kotlin.math.abs
-import kotlinx.coroutines.launch
 
 @Composable
 fun ProgressBarOnly(
@@ -200,7 +198,8 @@ fun PlaybackButtonsOnly(
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         // 宽度不足时先压缩间距、再整体缩小按钮，保证“上一首/下一首”始终完整显示
         val minSpacing = 8.dp
-        val baseSpacing = if (buttonSpacingDp > 0f) buttonSpacingDp.dp else (if (isPhone) 32.dp else 40.dp) * scale
+        val baseSpacing = (if (buttonSpacingDp > 0f) buttonSpacingDp.dp else (if (isPhone) 32.dp else 40.dp) * scale)
+            .coerceAtLeast(minSpacing)
         val baseSide = (if (isPhone) 40.dp else 48.dp) * scale * buttonSizeRatio
         val basePlay = (if (isPhone) 64.dp else 72.dp) * scale * buttonSizeRatio
         val fitScale = if (baseSide * 2 + basePlay + minSpacing * 2 > maxWidth) {
@@ -268,17 +267,20 @@ fun PlaylistOverlayPanel(
     playerState: PlayerState,
     isPhone: Boolean,
     onClose: () -> Unit,
-    // 关闭用的「跟手」回调：onDownDrag(deltaPx) 手指下移 delta 时调用(delta>0 表示下拉，用来关闭)
+    // 「跟手」回调：onDownDrag(deltaPx) delta>0=手指下移(关闭面板)、delta<0=手指上移(重新打开)。
+    // 宿主统一按 openPx = (openPx - delta).coerceIn(0..maxOpenPx) 处理即可双向跟手。
     onDownDrag: (Float) -> Unit = {},
     // 关闭手势松手后调用：由宿主吸附(settle)
     onDownDragEnd: () -> Unit = {}
 ) {
     val playlist = playerState.playlist
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val nestedScope = rememberCoroutineScope()
-    var nestedSettleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    // 本次「按住」期间是否已通过“歌单滚到顶再下拉”把面板往下拖过。
+    // 用于在真正松手时才吸附，避免按住不动时仍被 140ms 定时器自动吸附。
+    var pulledDownThisPress by remember { mutableStateOf(false) }
 
-    // 歌单滚到最顶后再下拉 → 交给面板关闭(嵌套滚动)，并在松手后自动归位吸附
+    // 歌单滚到最顶后再下拉 → 交给面板关闭(嵌套滚动)。
+    // 吸附(settle)不再用固定延时近似松手，而是等手指真正抬起时统一触发(见下方 pointerInput 监测)。
     val closeNested = remember(listState) {
         object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
             override fun onPostScroll(
@@ -291,13 +293,8 @@ fun PlaylistOverlayPanel(
                 if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput &&
                     available.y > 0f && atTop
                 ) {
+                    pulledDownThisPress = true
                     onDownDrag(available.y)
-                    // 每次下拉都重置计时；手指松开后若不再下拉，触发一次归位吸附
-                    nestedSettleJob?.cancel()
-                    nestedSettleJob = nestedScope.launch {
-                        kotlinx.coroutines.delay(140)
-                        onDownDragEnd()
-                    }
                     return androidx.compose.ui.geometry.Offset(0f, available.y)
                 }
                 return androidx.compose.ui.geometry.Offset.Zero
@@ -311,6 +308,26 @@ fun PlaylistOverlayPanel(
             .padding(horizontal = if (isPhone) 12.dp else 28.dp)
             .padding(bottom = if (isPhone) 20.dp else 32.dp)
             .nestedScroll(closeNested)
+            // 只监测不消费：面板内任意位置抬起手指时，若本次确有“歌单滚到顶再下拉”拖过面板，
+            // 才触发吸附(settle)。这样手指按住不动时不会自动吸附，跟手停留。
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    var wasPressed = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val pressedNow = event.changes.any { it.pressed }
+                        if (pressedNow && !wasPressed) {
+                            pulledDownThisPress = false
+                        } else if (!pressedNow && wasPressed) {
+                            if (pulledDownThisPress) {
+                                pulledDownThisPress = false
+                                onDownDragEnd()
+                            }
+                        }
+                        wasPressed = pressedNow
+                    }
+                }
+            }
     ) {
         val modeIcon = when (playerState.playbackMode) {
             PlaybackMode.LIST_LOOP -> Icons.Default.Repeat
@@ -326,11 +343,11 @@ fun PlaylistOverlayPanel(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                // 顶部整块区域下拖即关闭(跟手)
+                // 顶部整块区域下拖即关闭(跟手)；下拖途中反向上拖可再打开，双向跟手往返
                 .pointerInput(Unit) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
-                            if (dragAmount > 0f) {
+                            if (dragAmount != 0f) {
                                 change.consume()
                                 onDownDrag(dragAmount)
                             }
