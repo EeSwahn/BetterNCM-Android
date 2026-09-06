@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.TextUnit
 import com.example.bna.ui.animation.flowingLightEffect
 import com.example.bna.ui.animation.glowEffect
@@ -71,6 +72,7 @@ import com.example.bna.viewmodel.LyricsViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlin.math.abs
 import kotlin.math.max
 
 @Composable
@@ -496,9 +498,11 @@ fun ScanningGlowText(
     textAlign: TextAlign? = null,
     maxLines: Int = Int.MAX_VALUE,
     durationMillis: Int = 5500,
-    glowColor: Color = Color.White,
-    glowRadius: Float = 16f
+    glowColor: Color = Color.White
 ) {
+    // 去掉整段恒定光晕：静止时文字是柔和的半透明基色，不发光。
+    // 每 durationMillis 毫秒一个明亮的“发光带”从左侧进入、向右扫过文字再离开，
+    // 形成清晰可见的“从左向右扫描”效果。
     val infiniteTransition = rememberInfiniteTransition()
     val progress by infiniteTransition.animateFloat(
         initialValue = -0.5f,
@@ -512,7 +516,6 @@ fun ScanningGlowText(
 
     var textWidth by remember { mutableStateOf(0f) }
 
-    // 单层 Text：渐变笔刷扫亮带 + 阴影柔光，都挂在同一个 Text 上
     Text(
         text = text,
         color = color,
@@ -520,23 +523,36 @@ fun ScanningGlowText(
         fontWeight = fontWeight,
         textAlign = textAlign,
         maxLines = maxLines,
-        style = androidx.compose.ui.text.TextStyle(
-            brush = if (textWidth > 0f) {
-                val center = progress * textWidth
-                val band = textWidth * 0.4f
-                Brush.horizontalGradient(
-                    colorStops = arrayOf(
-                        ((center - band) / textWidth).coerceIn(0f, 1f) to color,
-                        (center / textWidth).coerceIn(0f, 1f) to glowColor,
-                        ((center + band) / textWidth).coerceIn(0f, 1f) to color
-                    )
-                )
-            } else null,
-            shadow = androidx.compose.ui.graphics.Shadow(
-                color = glowColor,
-                blurRadius = glowRadius
+        style = if (textWidth > 0f) {
+            val bandWidth = 0.5f   // 亮带宽度（占文字宽度的比例）
+            val edge = 0.12f       // 亮带两端的软过渡宽度
+            // progress ∈ [-0.5, 1.5] → 亮带中心从文字左外侧扫到右外侧
+            val center = ((progress + 0.5f) * (1f + bandWidth)) - bandWidth / 2f
+
+            fun maskAt(x: Float): Float {
+                val half = bandWidth / 2f
+                val dist = abs(x - center)
+                return when {
+                    dist <= half - edge -> 1f
+                    dist >= half + edge -> 0f
+                    else -> (half + edge - dist) / (2f * edge)
+                }
+            }
+
+            // 基色调暗、亮带用纯发光色，确保扫描亮带与静止文字有明显反差
+            val base = color.copy(alpha = (color.alpha * 0.55f).coerceIn(0f, 1f))
+            val samples = 24
+            val stops = Array(samples) { i ->
+                val x = i.toFloat() / (samples - 1)
+                x to lerp(base, glowColor, maskAt(x))
+            }
+
+            androidx.compose.ui.text.TextStyle(
+                brush = Brush.horizontalGradient(colorStops = stops)
             )
-        ),
+        } else {
+            androidx.compose.ui.text.TextStyle(color = color)
+        },
         modifier = modifier.onSizeChanged { textWidth = it.width.toFloat() }
     )
 }
