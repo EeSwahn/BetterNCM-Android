@@ -146,6 +146,9 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("beatGlowThreshold", 0.1f),
         LyricsSettingDef("beatGlowDelayMs", 352.9f)
     ),
+    "歌词显示" to listOf(
+        LyricsSettingDef("translationFontSize", 30f)
+    ),
     "歌词动画" to listOf(
         LyricsSettingDef("verticalScrollSpeed", 0.5f),
         LyricsSettingDef("scaleAnimationSpeed", 0.5f),
@@ -189,7 +192,8 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
 )
 
 val tabletLyricsBooleanSettings: List<Pair<String, Boolean>> = listOf(
-    "enableWordByWord" to true
+    "enableWordByWord" to true,
+    "showLyricsTranslation" to true
 )
 
 /**

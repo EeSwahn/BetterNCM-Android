@@ -375,8 +375,19 @@ class MusicRepository {
                 val response = api.getLyricEapi(params = params)
                 if (response.isSuccessful) {
                     val body = response.body()
-                    if (body != null) Result.Success(body)
-                    else Result.Error("歌词数据为空")
+                    if (body == null) {
+                        Result.Error("歌词数据为空")
+                    } else if (body.tlyric?.lyric.isNullOrBlank() && !body.lrc?.lyric.isNullOrBlank()) {
+                        // v1 接口对部分歌曲/游客身份不返回 tlyric，回退旧的 weapi 歌词接口补取翻译
+                        val translated = fetchLegacyTlyric(songId)
+                        if (translated.isNullOrBlank()) {
+                            Result.Success(body)
+                        } else {
+                            Result.Success(body.copy(tlyric = com.example.bna.data.model.LrcContent(translated)))
+                        }
+                    } else {
+                        Result.Success(body)
+                    }
                 } else {
                     Result.Error("获取歌词失败: ${response.code()}", response.code())
                 }
@@ -384,4 +395,13 @@ class MusicRepository {
                 Result.Error("连接失败: ${e.message ?: "未知错误"}")
             }
         }
+
+    /** 旧版 weapi 歌词接口兜底获取翻译，失败返回 null（不影响主歌词流程） */
+    private suspend fun fetchLegacyTlyric(songId: Long): String? = try {
+        val enc = weapi(mapOf("id" to songId.toString(), "lv" to -1, "kv" to -1, "tv" to -1))
+        val resp = api.getLyric(enc["params"]!!, enc["encSecKey"]!!)
+        if (resp.isSuccessful) resp.body()?.tlyric?.lyric?.takeIf { it.isNotBlank() } else null
+    } catch (e: Exception) {
+        null
+    }
 }

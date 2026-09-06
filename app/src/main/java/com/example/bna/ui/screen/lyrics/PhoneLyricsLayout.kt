@@ -109,6 +109,8 @@ fun PhoneLyricsLayout(
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
     var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", true)
+    var showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
+    var translationFontSize by rememberFloatPreference("translationFontSize", 30f)
     var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 98.0f)
     var beatGlowThreshold by rememberFloatPreference("beatGlowThreshold", 0.1f)
     var beatGlowDelayMs by rememberFloatPreference("beatGlowDelayMs", 352.9f)
@@ -397,6 +399,14 @@ fun PhoneLyricsLayout(
                 enableWordByWord = it
             },
             sections = listOf(
+                SliderSettingSection(
+                    title = "歌词显示",
+                    description = "控制主歌词下方的翻译显示。",
+                    items = listOf(
+                        SwitchSettingItem("显示歌词翻译", "有翻译的歌词会在主歌词下方同步显示译文。", showTranslation, { showTranslation = it }),
+                        SliderSettingItem("翻译字号", "调整翻译文字的显示大小，只影响翻译行，不影响主歌词。", translationFontSize, { translationFontSize = it }, 10f..40f, 30)
+                    )
+                ),
                 SliderSettingSection(
                     title = "封面发光",
                     description = "封面周围的发光效果，颜色自动从封面主色调提取。",

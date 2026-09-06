@@ -1,5 +1,6 @@
 package com.example.bna.ui.screen.lyrics
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -28,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
 import android.widget.Toast
 import androidx.compose.material3.AlertDialog
@@ -528,6 +530,14 @@ fun LyricsSettingsBottomSheet(
                 }
 
                 sections.forEach { section ->
+                    var expanded by androidx.compose.runtime.saveable.rememberSaveable(section.title) {
+                        mutableStateOf(false)
+                    }
+                    val arrowRotation by animateFloatAsState(
+                        targetValue = if (expanded) 180f else 0f,
+                        animationSpec = tween(250),
+                        label = "sectionArrow_${section.title}"
+                    )
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -541,21 +551,43 @@ fun LyricsSettingsBottomSheet(
                             .padding(horizontal = 16.dp, vertical = 18.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                text = section.title,
-                                color = TextPrimary,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = section.description,
-                                color = TextTertiary,
-                                fontSize = 12.sp,
-                                lineHeight = 18.sp
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null
+                                ) { expanded = !expanded },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = section.title,
+                                    color = TextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = section.description,
+                                    color = TextTertiary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (expanded) "收起" else "展开",
+                                tint = TextSecondary,
+                                modifier = Modifier.graphicsLayer { rotationZ = arrowRotation }
                             )
                         }
 
+                        AnimatedVisibility(visible = expanded) {
+                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         section.items.forEach { item ->
                             when (item) {
                                 is SliderSettingItem -> {
@@ -610,6 +642,8 @@ fun LyricsSettingsBottomSheet(
                                 }
                             }
                         }
+                            }
+                        }
                     }
                 }
 
@@ -634,6 +668,7 @@ private fun formatSliderValue(label: String, value: Float): String {
         label.contains("频率") -> if (value < 0.01f) "关闭" else String.format(java.util.Locale.US, "%.1fHz", value)
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
+        label.contains("字号") -> String.format(java.util.Locale.US, "%.0fsp", value)
         label.contains("间距") -> String.format(java.util.Locale.US, "%.0fdp", value)
         label.contains("宽") && !label.contains("偏移") -> String.format(java.util.Locale.US, "%.1fx", value)
         label.contains("大小") -> String.format(java.util.Locale.US, "%.1fx", value)
@@ -647,6 +682,7 @@ private fun formatSliderEdgeValue(label: String, value: Float): String {
         label.contains("频率") -> if (value < 0.01f) "关闭" else String.format(java.util.Locale.US, "%.1fHz", value)
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
+        label.contains("字号") -> String.format(java.util.Locale.US, "%.0fsp", value)
         label.contains("间距") -> String.format(java.util.Locale.US, "%.0f", value)
         else -> String.format(java.util.Locale.US, "%.1f", value)
     }

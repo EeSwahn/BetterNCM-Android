@@ -1,6 +1,9 @@
 package com.example.bna.ui.screen.lyrics
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
@@ -28,6 +31,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -37,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
@@ -204,6 +209,8 @@ fun LyricLineItem(
     val isPlaying by remember {
         MusicPlayer.playerState.map { it.isPlaying }.distinctUntilChanged()
     }.collectAsState(initial = MusicPlayer.playerState.value.isPlaying)
+    val showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
+    val translationFontSizePref by rememberFloatPreference("translationFontSize", 30f)
     val playerState by MusicPlayer.playerState.collectAsState()
     val animationConfig = rememberLyricsAnimationConfig()
 
@@ -374,17 +381,32 @@ fun LyricLineItem(
             )
         }
 
-        line.translation?.let { translation ->
-            if (isCurrent) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = translation,
-                    color = NeteaseRed.copy(alpha = 0.8f),
-                    fontSize = if (isPhone) 14.sp else 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
+        // 翻译行：常驻显示 + 颜色/字重跟随主歌词，AnimatedVisibility 淡入淡出，
+        // 避免之前只显示当前行导致的"突然出现突然消失"。
+        val translationText = if (showTranslation) line.translation else null
+        AnimatedVisibility(
+            visible = translationText != null,
+            enter = fadeIn(animationSpec = tween(animationDuration, easing = FastOutSlowInEasing)),
+            exit = fadeOut(animationSpec = tween(animationDuration, easing = FastOutSlowInEasing))
+        ) {
+            val translationColor by animateColorAsState(
+                targetValue = textColor,
+                animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
+                label = "translationColor"
+            )
+            val translationFontSize = translationFontSizePref.coerceIn(10f, 40f).sp
+            val translationLineHeight = translationFontSize * 1.35f
+            Text(
+                text = translationText.orEmpty(),
+                color = translationColor,
+                fontSize = translationFontSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = if (isPhone) TextAlign.Center else TextAlign.Start,
+                lineHeight = translationLineHeight,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .alpha(animatedLineAlpha)
+            )
         }
     }
 }
@@ -488,62 +510,33 @@ fun ScanningGlowText(
         label = "scanningGlowProgress"
     )
 
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        // Base layer
-        Text(
-            text = text,
-            color = color,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            textAlign = textAlign,
-            maxLines = maxLines
-        )
-        
-        // Scanning glow layer
-        Text(
-            text = text,
-            color = Color.Transparent,
-            fontSize = fontSize,
-            fontWeight = fontWeight,
-            textAlign = textAlign,
-            maxLines = maxLines,
-            style = androidx.compose.ui.text.TextStyle(
-                shadow = androidx.compose.ui.graphics.Shadow(
-                    color = glowColor,
-                    blurRadius = glowRadius
-                )
-            ),
-            modifier = Modifier
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints)
-                    layout(0, 0) {
-                        placeable.place(-placeable.width / 2, -placeable.height / 2)
-                    }
-                }
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    val width = size.width
-                    val center = progress * width
-                    val glowWidth = width * 0.4f
-                    drawRect(
-                        brush = Brush.horizontalGradient(
-                            0.0f to Color.Transparent,
-                            0.5f to Color.Black,
-                            1.0f to Color.Transparent,
-                            startX = center - glowWidth / 2,
-                            endX = center + glowWidth / 2
-                        ),
-                        blendMode = BlendMode.DstIn
+    var textWidth by remember { mutableStateOf(0f) }
+
+    // 单层 Text：渐变笔刷扫亮带 + 阴影柔光，都挂在同一个 Text 上
+    Text(
+        text = text,
+        color = color,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        textAlign = textAlign,
+        maxLines = maxLines,
+        style = androidx.compose.ui.text.TextStyle(
+            brush = if (textWidth > 0f) {
+                val center = progress * textWidth
+                val band = textWidth * 0.4f
+                Brush.horizontalGradient(
+                    colorStops = arrayOf(
+                        ((center - band) / textWidth).coerceIn(0f, 1f) to color,
+                        (center / textWidth).coerceIn(0f, 1f) to glowColor,
+                        ((center + band) / textWidth).coerceIn(0f, 1f) to color
                     )
-                }
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints)
-                    val extra = 24.dp.roundToPx()
-                    layout(placeable.width + extra * 2, placeable.height + extra * 2) {
-                        placeable.place(extra, extra)
-                    }
-                }
-        )
-    }
+                )
+            } else null,
+            shadow = androidx.compose.ui.graphics.Shadow(
+                color = glowColor,
+                blurRadius = glowRadius
+            )
+        ),
+        modifier = modifier.onSizeChanged { textWidth = it.width.toFloat() }
+    )
 }

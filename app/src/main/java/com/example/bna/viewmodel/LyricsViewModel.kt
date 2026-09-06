@@ -200,17 +200,59 @@ private fun parseToMap(text: String): Map<Long, String> {
     return map
 }
 
+/**
+ * 翻译匹配器：主歌词(LRC/YRC)与翻译(tlyric)经常不是同一份时间轴，
+ * 精确时间戳查找会大面积落空（典型如 YRC 毫秒时间戳与 tlyric 的 LRC 时间戳有毫秒级偏差）。
+ * 匹配策略：精确命中 → 最近时间戳(±容差内) → 行数一致时按行索引兜底。
+ */
+private class TranslationMatcher(transText: String) {
+    private val times: LongArray
+    private val texts: Array<String>
+
+    init {
+        val sorted = parseToMap(transText).toSortedMap()
+        times = sorted.keys.toLongArray()
+        texts = sorted.values.toTypedArray()
+    }
+
+    val size: Int get() = times.size
+
+    fun atIndex(index: Int): String? = texts.getOrNull(index)
+
+    fun match(timeMs: Long, toleranceMs: Long = 1500L): String? {
+        if (times.isEmpty()) return null
+        val idx = java.util.Arrays.binarySearch(times, timeMs)
+        if (idx >= 0) return texts[idx]
+        val ins = -idx - 1
+        val lowerDiff = if (ins > 0) timeMs - times[ins - 1] else Long.MAX_VALUE
+        val upperDiff = if (ins < times.size) times[ins] - timeMs else Long.MAX_VALUE
+        return if (lowerDiff <= upperDiff) {
+            if (lowerDiff <= toleranceMs) texts[ins - 1] else null
+        } else {
+            if (upperDiff <= toleranceMs) texts[ins] else null
+        }
+    }
+}
+
+/** 时间匹配失败的行，若翻译行数与主歌词行数一致，按行序对齐兜底 */
+private fun List<LyricLine>.fillTranslationByIndex(matcher: TranslationMatcher): List<LyricLine> {
+    if (matcher.size != size || none { it.translation == null }) return this
+    return mapIndexed { i, line ->
+        if (line.translation == null) line.copy(translation = matcher.atIndex(i)) else line
+    }
+}
+
 fun parseLrc(lrcText: String, transText: String = ""): List<LyricLine> {
     val main  = parseToMap(lrcText)
-    val trans = parseToMap(transText)
-    
-    val baseLines = main.map { (time, text) -> 
+    val matcher = TranslationMatcher(transText)
+
+    val baseLines = main.map { (time, text) ->
         LyricLine(
             timeMs = time,
             text = text,
-            translation = trans[time]
+            translation = matcher.match(time)
         )
-    }.sortedBy { it.timeMs }
+    }.sortedBy { it.timeMs }.fillTranslationByIndex(matcher)
 
     return baseLines.mapIndexed { index, line ->
         val duration = if (index < baseLines.size - 1) {
@@ -225,7 +267,7 @@ fun parseLrc(lrcText: String, transText: String = ""): List<LyricLine> {
 // ─── YRC 解析 ──────────────────────────────────────────────────────────────
 
 fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
-    val trans = parseToMap(transText)
+    val matcher = TranslationMatcher(transText)
     val lines = mutableListOf<LyricLine>()
     
     // 匹配 [开始时间,持续时间] 内容
@@ -271,7 +313,7 @@ fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
                     lines.add(LyricLine(
                         timeMs = startTime,
                         text = fullText.toString(),
-                        translation = trans[startTime],
+                        translation = matcher.match(startTime),
                         durationMs = duration,
                         words = words
                     ))
@@ -282,7 +324,7 @@ fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
                          lines.add(LyricLine(
                             timeMs = startTime,
                             text = cleanText,
-                            translation = trans[startTime],
+                            translation = matcher.match(startTime),
                             durationMs = duration
                         ))
                     }
@@ -290,8 +332,8 @@ fun parseYrc(yrcText: String, transText: String = ""): List<LyricLine> {
             }
         }
     }
-    
-    return lines
+
+    return lines.fillTranslationByIndex(matcher)
 }
 
 // ─── 内置测试歌词：蔡依林《说爱你》 ─────────────────────────────────────────
