@@ -2,6 +2,7 @@ package com.example.bna.ui.screen.lyrics
 
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
@@ -37,15 +39,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +58,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.BlendMode
@@ -65,6 +71,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +91,7 @@ import com.example.bna.ui.theme.TextTertiary
 import com.example.bna.viewmodel.LyricsUiState
 import com.example.bna.viewmodel.LyricsViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun PhoneLyricsLayout(
@@ -119,6 +127,28 @@ fun PhoneLyricsLayout(
     var showSettings by remember { mutableStateOf(false) }
     var lyricsControlsVisible by remember { mutableStateOf(true) }
     var lyricsInteractionVersion by remember { mutableStateOf(0) }
+    // 播放列表：封面页上划“跟手拖拽+松手吸附”，封面内容整体上移、列表从底部滑入；歌词页不受影响
+    var openPx by remember { mutableStateOf(0f) }
+    var maxOpenPx by remember { mutableStateOf(0f) }
+    val dragScope = rememberCoroutineScope()
+    fun settle() {
+        val limit = maxOpenPx
+        if (limit <= 0f) return
+        val target = if (openPx > limit * 0.45f) limit else 0f
+        dragScope.launch {
+            val a = Animatable(openPx)
+            a.animateTo(target, animationSpec = tween(300)) { openPx = value }
+        }
+    }
+    fun snapClosed() {
+        dragScope.launch {
+            val a = Animatable(openPx)
+            a.animateTo(0f, animationSpec = tween(280)) { openPx = value }
+        }
+    }
+    BackHandler(enabled = openPx > 24f) {
+        snapClosed()
+    }
 
     val context = LocalContext.current
     var dominantColor by remember { mutableStateOf(Color(0xFF00BFFF)) }
@@ -229,7 +259,12 @@ fun PhoneLyricsLayout(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
+            IconButton(
+                onClick = {
+                    if (openPx > 24f) snapClosed() else onDismiss()
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
                 Icon(
                     imageVector = Icons.Default.KeyboardArrowDown,
                     contentDescription = "关闭",
@@ -293,13 +328,28 @@ fun PhoneLyricsLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.width(40.dp))
+            // 设置按钮：占位在歌曲标题右侧，替换原来空位占位
+            IconButton(
+                onClick = {
+                    registerLyricsInteraction()
+                    showSettings = !showSettings
+                },
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = "设置",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         HorizontalPager(
             state = pagerState,
+            userScrollEnabled = openPx <= 1f,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -353,14 +403,60 @@ fun PhoneLyricsLayout(
                     }
                 }
             } else {
-                PhoneAlbumPage(
-                    song = song,
-                    glowBrightness = glowBrightness,
-                    glowBreathFrequency = glowBreathFrequency,
-                    glowScaleSize = glowScaleSize,
-                    dominantColor = dominantColor,
-                    audioAmplitude = audioAmplitude
-                )
+                // 手机版：封面页上划“跟手拖拽+松手吸附”打开播放列表
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clipToBounds()
+                        .onSizeChanged { maxOpenPx = it.height.toFloat() }
+                ) {
+                    // 封面内容整体上移：跟手多少上移多少
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { translationY = -openPx }
+                            .pointerInput(Unit) {
+                                detectVerticalDragGestures(
+                                    onVerticalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        openPx = (openPx - dragAmount).coerceIn(0f, maxOpenPx)
+                                    },
+                                    onDragEnd = { settle() },
+                                    onDragCancel = { settle() }
+                                )
+                            }
+                    ) {
+                        PhoneAlbumPage(
+                            song = song,
+                            glowBrightness = glowBrightness,
+                            glowBreathFrequency = glowBreathFrequency,
+                            glowScaleSize = glowScaleSize,
+                            dominantColor = dominantColor,
+                            audioAmplitude = audioAmplitude
+                        )
+                    }
+
+                    // 播放列表从封面区域底部随拖露出
+                    if (maxOpenPx > 0f) {
+                        val ps by com.example.bna.player.MusicPlayer.playerState.collectAsState()
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { translationY = maxOpenPx - openPx }
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // 顶部整块区域(面板头部)下拖跟手关闭；歌单滚到顶再下拉也可关闭
+                                PlaylistOverlayPanel(
+                                    playerState = ps,
+                                    isPhone = true,
+                                    onClose = { snapClosed() },
+                                    onDownDrag = { d -> openPx = (openPx - d).coerceIn(0f, maxOpenPx) },
+                                    onDownDragEnd = { settle() }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -379,13 +475,6 @@ fun PhoneLyricsLayout(
                     Spacer(modifier = Modifier.height(18.dp))
                     PlaybackControls(isPhone = true)
                     Spacer(modifier = Modifier.height(12.dp))
-                    BottomActionButtons(
-                        isPhone = true,
-                        onSettingsClick = {
-                            registerLyricsInteraction()
-                            showSettings = !showSettings
-                        }
-                    )
                 }
             }
         }

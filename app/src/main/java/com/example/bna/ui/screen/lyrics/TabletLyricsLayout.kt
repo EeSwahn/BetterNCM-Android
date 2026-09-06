@@ -1,9 +1,11 @@
 package com.example.bna.ui.screen.lyrics
 
 import android.graphics.drawable.BitmapDrawable
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +18,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -25,6 +28,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +45,8 @@ import com.example.bna.ui.animation.*
 import com.example.bna.ui.theme.*
 import com.example.bna.viewmodel.LyricsViewModel
 import com.example.bna.viewmodel.LyricsUiState
+import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.launch
 
 @Composable
 fun TabletLyricsLayout(
@@ -57,6 +63,32 @@ fun TabletLyricsLayout(
     var baseFontSizeRatio by rememberFloatPreference("baseFontSizeRatio", 1.3f)
     var lineSpacingRatio by rememberFloatPreference("lineSpacingRatio", 0.5f)
     var showSettings by remember { mutableStateOf(false) }
+
+    // ---- 播放列表「跟手拖拽 + 松手吸附」开合 ----
+    // openPx: 0=关闭, 正值=已向上推出的距离(不超过左栏高)；“跟手多少移多少”
+    var openPx by remember { mutableStateOf(0f) }
+    var maxOpenPx by remember { mutableStateOf(0f) }
+    val dragScope = rememberCoroutineScope()
+
+    fun settle() {
+        val limit = maxOpenPx
+        if (limit <= 0f) return
+        val target = if (openPx > limit * 0.45f) limit else 0f
+        dragScope.launch {
+            val a = Animatable(openPx)
+            a.animateTo(target, animationSpec = tween(300)) { openPx = value }
+        }
+    }
+    fun snapClosed() {
+        dragScope.launch {
+            val a = Animatable(openPx)
+            a.animateTo(0f, animationSpec = tween(280)) { openPx = value }
+        }
+    }
+
+    BackHandler(enabled = openPx > 24f) {
+        snapClosed()
+    }
 
     var headerOffsetX by rememberFloatPreference("headerOffsetX", 0f)
     var headerOffsetY by rememberFloatPreference("headerOffsetY", 35.966827f)
@@ -184,7 +216,9 @@ fun TabletLyricsLayout(
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .clipToBounds()
+                .onSizeChanged { maxOpenPx = it.height.toFloat() },
             contentAlignment = Alignment.Center
         ) {
             // 以约 560dp 的左栏内容高度为基准做等比收缩，小屏上所有元素都能完整落位
@@ -206,8 +240,23 @@ fun TabletLyricsLayout(
             val coverEdge = minOf(idealWidth, coverCapByHeight)
             val spacerScale = ((maxHeight - estimatedFixedHeight - coverEdge) / (84.dp * uiScale)).coerceIn(0.2f, 1f)
 
+            // 左列“现在播放/封面”整体作为一组：上划跟手、开列表时上移推出屏幕
             Column(
-                modifier = Modifier.width(coverEdge).fillMaxHeight()
+                modifier = Modifier
+                    .width(coverEdge)
+                    .fillMaxHeight()
+                    .graphicsLayer { translationY = -openPx }
+                    // 手指上划多少就跟手上移多少；松手超过阈值自动吸附打开/否则弹回
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                openPx = (openPx - dragAmount).coerceIn(0f, maxOpenPx)
+                            },
+                            onDragEnd = { settle() },
+                            onDragCancel = { settle() }
+                        )
+                    }
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().offset(x = (headerOffsetX * uiScale).dp, y = (headerOffsetY * uiScale).dp),
@@ -219,7 +268,18 @@ fun TabletLyricsLayout(
                         Spacer(modifier = Modifier.height(4.dp * uiScale))
                         Text(text = song.artistNames, color = TextSecondary, fontSize = (14f * uiScale).coerceAtLeast(10f).sp, textAlign = TextAlign.Start, maxLines = 1)
                     }
-                    Icon(Icons.Default.Podcasts, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(24.dp * uiScale))
+                    // 设置按钮：替换原歌曲标题右侧图标
+                    IconButton(
+                        onClick = { showSettings = !showSettings },
+                        modifier = Modifier.size(40.dp * uiScale)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "设置",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(22.dp * uiScale)
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(28.dp * uiScale * spacerScale))
@@ -334,15 +394,29 @@ fun TabletLyricsLayout(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
+            }
 
-                BottomActionButtons(
-                    isPhone = false,
-                    modifier = Modifier.offset(x = (bottomOffsetX * uiScale).dp, y = (bottomOffsetY * uiScale).dp),
-                    onSettingsClick = { showSettings = !showSettings },
-                    scale = uiScale,
-                    buttonSizeRatio = bottomButtonSizeRatio,
-                    buttonSpacingDp = bottomButtonSpacingDp
-                )
+            // 播放列表层：随 openPx 从底部露出，占据原左栏；右栏歌词保持不动
+            if (maxOpenPx > 0f) {
+                val ps by com.example.bna.player.MusicPlayer.playerState.collectAsState()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { translationY = maxOpenPx - openPx }
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // 顶部整块区域(面板头部)下拖跟手关闭；歌单滚到顶再下拉也可关闭
+                        PlaylistOverlayPanel(
+                            playerState = ps,
+                            isPhone = false,
+                            onClose = { snapClosed() },
+                            onDownDrag = { d -> openPx = (openPx - d).coerceIn(0f, maxOpenPx) },
+                            onDownDragEnd = { settle() }
+                        )
+                    }
+                }
             }
         }
 

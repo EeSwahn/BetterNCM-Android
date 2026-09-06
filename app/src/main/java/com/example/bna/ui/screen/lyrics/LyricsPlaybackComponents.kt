@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,35 +27,32 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.res.painterResource
 import com.example.bna.R
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,13 +61,13 @@ import coil.compose.AsyncImage
 import com.example.bna.player.MusicPlayer
 import com.example.bna.player.PlaybackMode
 import com.example.bna.player.PlayerState
-import com.example.bna.ui.theme.DarkBackground
 import com.example.bna.ui.theme.DarkCard
 import com.example.bna.ui.theme.NeteaseRed
 import com.example.bna.ui.theme.TextPrimary
 import com.example.bna.ui.theme.TextSecondary
 import com.example.bna.ui.theme.TextTertiary
 import kotlin.math.abs
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProgressBarOnly(
@@ -266,126 +264,124 @@ fun PlaybackControls(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
-fun BottomActionButtons(
-    isPhone: Boolean = false,
-    modifier: Modifier = Modifier,
-    scale: Float = 1f,
-    buttonSizeRatio: Float = 1f,
-    buttonSpacingDp: Float = 0f,
-    onSettingsClick: () -> Unit
+fun PlaylistOverlayPanel(
+    playerState: PlayerState,
+    isPhone: Boolean,
+    onClose: () -> Unit,
+    // 关闭用的「跟手」回调：onDownDrag(deltaPx) 手指下移 delta 时调用(delta>0 表示下拉，用来关闭)
+    onDownDrag: (Float) -> Unit = {},
+    // 关闭手势松手后调用：由宿主吸附(settle)
+    onDownDragEnd: () -> Unit = {}
 ) {
-    val playerState by MusicPlayer.playerState.collectAsState()
-    var showPlaylistSheet by remember { mutableStateOf(false) }
+    val playlist = playerState.playlist
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val nestedScope = rememberCoroutineScope()
+    var nestedSettleJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-    Row(
-        modifier = modifier
+    // 歌单滚到最顶后再下拉 → 交给面板关闭(嵌套滚动)，并在松手后自动归位吸附
+    val closeNested = remember(listState) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPostScroll(
+                consumed: androidx.compose.ui.geometry.Offset,
+                available: androidx.compose.ui.geometry.Offset,
+                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource
+            ): androidx.compose.ui.geometry.Offset {
+                val atTop = listState.firstVisibleItemIndex == 0 &&
+                    listState.firstVisibleItemScrollOffset == 0
+                if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput &&
+                    available.y > 0f && atTop
+                ) {
+                    onDownDrag(available.y)
+                    // 每次下拉都重置计时；手指松开后若不再下拉，触发一次归位吸附
+                    nestedSettleJob?.cancel()
+                    nestedSettleJob = nestedScope.launch {
+                        kotlinx.coroutines.delay(140)
+                        onDownDragEnd()
+                    }
+                    return androidx.compose.ui.geometry.Offset(0f, available.y)
+                }
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isPhone) 8.dp else 0.dp)
-            .padding(bottom = (if (isPhone) 0.dp else 16.dp) * scale),
-        horizontalArrangement = if (buttonSpacingDp > 0f) {
-            Arrangement.spacedBy(buttonSpacingDp.dp, Alignment.CenterHorizontally)
-        } else {
-            Arrangement.SpaceBetween
-        },
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = if (isPhone) 12.dp else 28.dp)
+            .padding(bottom = if (isPhone) 20.dp else 32.dp)
+            .nestedScroll(closeNested)
     ) {
-        val playbackModeIcon = when (playerState.playbackMode) {
+        val modeIcon = when (playerState.playbackMode) {
             PlaybackMode.LIST_LOOP -> Icons.Default.Repeat
             PlaybackMode.SINGLE_LOOP -> Icons.Default.RepeatOne
             PlaybackMode.SHUFFLE -> Icons.Default.Shuffle
         }
-        val playbackModeLabel = when (playerState.playbackMode) {
+        val modeLabel = when (playerState.playbackMode) {
             PlaybackMode.LIST_LOOP -> "列表循环"
             PlaybackMode.SINGLE_LOOP -> "单曲循环"
             PlaybackMode.SHUFFLE -> "随机播放"
         }
 
-        ActionButton(
-            icon = playbackModeIcon,
-            contentDescription = playbackModeLabel,
-            isPhone = isPhone,
-            onClick = { MusicPlayer.cyclePlaybackMode() },
-            tint = NeteaseRed,
-            scale = scale * buttonSizeRatio
-        )
-        ActionButton(Icons.Default.Timer, "定时关闭", isPhone, scale = scale * buttonSizeRatio)
-        ActionButton(Icons.Default.Tune, "设置", isPhone, onClick = onSettingsClick, scale = scale * buttonSizeRatio)
-        ActionButton(Icons.Default.List, "播放列表", isPhone, onClick = { showPlaylistSheet = true }, scale = scale * buttonSizeRatio)
-    }
-
-    if (showPlaylistSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showPlaylistSheet = false },
-            containerColor = DarkBackground,
-            contentColor = TextPrimary
-        ) {
-            PlaylistBottomSheetContent(
-                playerState = playerState,
-                isPhone = isPhone,
-                onDismiss = { showPlaylistSheet = false }
-            )
-        }
-    }
-}
-
-@Composable
-fun ActionButton(
-    icon: ImageVector,
-    contentDescription: String,
-    isPhone: Boolean,
-    onClick: () -> Unit = {},
-    tint: Color = TextSecondary,
-    scale: Float = 1f
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size((if (isPhone) 40.dp else 48.dp) * scale)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription,
-            tint = tint,
-            modifier = Modifier.size((if (isPhone) 24.dp else 28.dp) * scale)
-        )
-    }
-}
-
-@Composable
-private fun PlaylistBottomSheetContent(
-    playerState: PlayerState,
-    isPhone: Boolean,
-    onDismiss: () -> Unit
-) {
-    val playlist = playerState.playlist
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp)
-    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                // 顶部整块区域下拖即关闭(跟手)
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            if (dragAmount > 0f) {
+                                change.consume()
+                                onDownDrag(dragAmount)
+                            }
+                        },
+                        onDragEnd = { onDownDragEnd() },
+                        onDragCancel = { onDownDragEnd() }
+                    )
+                },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            // 单曲循环/随机播放/列表循环 移到播放列表内：单图标循环点击切换
+            IconButton(
+                onClick = { MusicPlayer.cyclePlaybackMode() },
+                modifier = Modifier.size(if (isPhone) 44.dp else 52.dp)
+            ) {
+                Icon(
+                    imageVector = modeIcon,
+                    contentDescription = modeLabel,
+                    tint = NeteaseRed,
+                    modifier = Modifier.size(if (isPhone) 24.dp else 28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "当前播放",
                     color = TextPrimary,
                     fontSize = if (isPhone) 18.sp else 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "共 ${playlist.size} 首", color = TextTertiary, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "共 ${playlist.size} 首 · $modeLabel",
+                    color = TextTertiary,
+                    fontSize = 12.sp
+                )
             }
-            TextButton(onClick = onDismiss) {
-                Text(text = "关闭", color = TextSecondary)
+
+            IconButton(onClick = onClose, modifier = Modifier.size(if (isPhone) 40.dp else 48.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "关闭",
+                    tint = TextSecondary,
+                    modifier = Modifier.size(if (isPhone) 22.dp else 26.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (playlist.isEmpty()) {
             Box(
@@ -400,9 +396,10 @@ private fun PlaylistBottomSheetContent(
         }
 
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = if (isPhone) 420.dp else 520.dp),
+                .heightIn(max = if (isPhone) 420.dp else 560.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 12.dp)
         ) {
@@ -413,11 +410,11 @@ private fun PlaylistBottomSheetContent(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(18.dp))
                         .background(
-                            if (isCurrent) NeteaseRed.copy(alpha = 0.14f) else DarkCard.copy(alpha = 0.62f)
+                            if (isCurrent) NeteaseRed.copy(alpha = 0.16f) else DarkCard.copy(alpha = 0.55f)
                         )
                         .clickable {
+                            // 切换歌曲后保持在播放列表，不自动关闭
                             MusicPlayer.playSongAt(index)
-                            onDismiss()
                         }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -441,7 +438,7 @@ private fun PlaylistBottomSheetContent(
                         modifier = Modifier
                             .size(if (isPhone) 42.dp else 46.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(DarkCard),
+                            .background(DarkCard.copy(alpha = 0.9f)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (song.albumCoverUrl.isNotEmpty()) {
@@ -466,7 +463,8 @@ private fun PlaylistBottomSheetContent(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = song.name,
-                            color = if (isCurrent) TextPrimary else TextSecondary,
+                            // 所有歌曲标题统一纯白
+                            color = TextPrimary,
                             fontSize = 15.sp,
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1
