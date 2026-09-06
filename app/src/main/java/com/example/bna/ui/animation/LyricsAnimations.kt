@@ -1,17 +1,9 @@
 package com.example.bna.ui.animation
 
-import androidx.compose.animation.core.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.unit.dp
-import com.example.bna.viewmodel.SettingsViewModel
 
 @Composable
 fun Modifier.lyrics3DEffect(
@@ -57,27 +49,6 @@ fun Modifier.flowingLightEffect(
 }
 
 @Composable
-fun Modifier.clickBounceEffect(
-    isPressed: Boolean
-): Modifier {
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "bounceScale"
-    )
-    
-    return this.then(
-        Modifier.graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-    )
-}
-
-@Composable
 fun Modifier.glowEffect(
     isCurrent: Boolean,
     glowColor: Color = Color.White,
@@ -96,17 +67,6 @@ fun Modifier.glowEffect(
     )
 }
 
-@Composable
-fun Modifier.smoothScrollEffect(
-    offset: Float
-): Modifier {
-    return this.then(
-        Modifier.graphicsLayer {
-            translationY = offset
-        }
-    )
-}
-
 
 data class LyricsAnimationConfig(
     val enable3DEffect: Boolean = true,
@@ -117,18 +77,4 @@ data class LyricsAnimationConfig(
 )
 
 @Composable
-fun rememberLyricsAnimationConfig(
-    settingsViewModel: SettingsViewModel? = null
-): LyricsAnimationConfig {
-    val animationState = settingsViewModel?.animationState?.collectAsState()?.value
-    
-    return remember(animationState) {
-        LyricsAnimationConfig(
-            enable3DEffect = animationState?.enable3DEffect ?: true,
-            enableFlowingLight = animationState?.enableFlowingLight ?: true,
-            enableGlowEffect = animationState?.enableGlowEffect ?: true,
-            reduceFlowingLightEffect = animationState?.reduceFlowingLightEffect ?: false,
-            flowingLightMode = animationState?.flowingLightMode ?: 0
-        )
-    }
-}
+fun rememberLyricsAnimationConfig(): LyricsAnimationConfig = LyricsAnimationConfig()

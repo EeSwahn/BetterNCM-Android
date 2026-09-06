@@ -20,9 +20,4 @@ val TextTertiary = Color(0xFF707070)
 
 // 辅助色
 val AccentGold = Color(0xFFFFD700)
-val AccentGreen = Color(0xFF1DB954)
 val DividerColor = Color(0xFF2A2A2A)
-
-// 渐变色
-val GradientStart = Color(0xFF1A0000)
-val GradientEnd = Color(0xFF0D0D0D)
