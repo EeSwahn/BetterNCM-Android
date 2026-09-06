@@ -163,6 +163,9 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("wordScaleSpeed", 0.27f),
         LyricsSettingDef("wordScaleSize", 1.0f)
     ),
+    "歌词模糊" to listOf(
+        LyricsSettingDef("lyricBlurIntensity", 0.48f)
+    ),
     "按钮调节" to listOf(
         LyricsSettingDef("playbackButtonSizeRatio", 0.6888889f),
         LyricsSettingDef("playbackButtonSpacingDp", 0f),
@@ -193,7 +196,8 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
 
 val tabletLyricsBooleanSettings: List<Pair<String, Boolean>> = listOf(
     "enableWordByWord" to true,
-    "showLyricsTranslation" to true
+    "showLyricsTranslation" to true,
+    "enableLyricBlur" to true
 )
 
 /**

@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -73,6 +74,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.math.max
 
 @Composable
@@ -92,7 +94,9 @@ fun LyricsPanel(
     yrcFloatIntensity: Float = 12f,
     wordTimingOffsetMs: Float = 0f,
     wordScaleSpeed: Float = 1.0f,
-    wordScaleSize: Float = 1.3f
+    wordScaleSize: Float = 1.3f,
+    enableLyricBlur: Boolean = false,
+    lyricBlurIntensity: Float = 1.0f
 ) {
     val listState = rememberLazyListState()
 
@@ -182,7 +186,9 @@ fun LyricsPanel(
                         yrcFloatIntensity = yrcFloatIntensity,
                         wordTimingOffsetMs = wordTimingOffsetMs,
                         wordScaleSpeed = wordScaleSpeed,
-                        wordScaleSize = wordScaleSize
+                        wordScaleSize = wordScaleSize,
+                        enableLyricBlur = enableLyricBlur,
+                        lyricBlurIntensity = lyricBlurIntensity
                     )
                 }
             }
@@ -206,7 +212,9 @@ fun LyricLineItem(
     yrcFloatIntensity: Float = 12f,
     wordTimingOffsetMs: Float = 0f,
     wordScaleSpeed: Float = 1.0f,
-    wordScaleSize: Float = 1.3f
+    wordScaleSize: Float = 1.3f,
+    enableLyricBlur: Boolean = false,
+    lyricBlurIntensity: Float = 1.0f
 ) {
     val isPlaying by remember {
         MusicPlayer.playerState.map { it.isPlaying }.distinctUntilChanged()
@@ -257,6 +265,29 @@ fun LyricLineItem(
     )
     val lineAlpha = if (usesWordByWordFlow) 1f else animatedLineAlpha
 
+    // 景深模糊：以“当前居中歌词”为清晰焦点，越往上/下越远越模糊。
+    // 距离-模糊映射采用对数曲线：离开中心后快速起糊，再随距离增大逐渐趋缓、逼近最大模糊，
+    // 形成焦点附近“陡起步、远处收敛”的浅景深观感（相比线性/二次曲线边界更清晰、饱和更柔和）。
+    // 模糊半径按行高缩放，使手机(小字号)与平板(大字号)观感一致。
+    // enableLyricBlur 关闭或 lyricBlurIntensity 为 0 时完全不模糊。
+    val blurEnabled = enableLyricBlur && lyricBlurIntensity > 0f
+    val focusBlurDistance = 6f          // 超过该行数模糊度达到饱和
+    val logSteepness = 9f               // 对数曲线陡峭系数：越大则近处起步越急、收敛越快
+    val blurRadiusUnit = (layoutFontSize * 0.22f).coerceIn(4f, 14f) // 随字号缩放的最大模糊半径
+    val targetBlur = if (!blurEnabled || isCurrent) {
+        0f
+    } else {
+        // 对数映射：y = ln(1 + a·x) / ln(1 + a)，x∈[0,1] → y∈[0,1]，且 x 小处斜率大、远处趋缓。
+        val focusNorm = (distance.toFloat() / focusBlurDistance).coerceIn(0f, 1f)
+        val logWeight = ln(1f + logSteepness * focusNorm) / ln(1f + logSteepness)
+        blurRadiusUnit * lyricBlurIntensity.coerceIn(0f, 1f) * logWeight
+    }
+    val blurRadius by animateFloatAsState(
+        targetValue = targetBlur,
+        animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
+        label = "blur"
+    )
+
     val textColor by animateColorAsState(
         targetValue = if (isCurrent) Color.White else TextSecondary,
         animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
@@ -294,6 +325,11 @@ fun LyricLineItem(
                 horizontal = if (isPhone) 4.dp else 32.dp,
                 vertical = 4.dp * lineSpacingRatio
             )
+            .let { modifier ->
+                // 景深模糊：居中歌词清晰，越靠上/下越模糊。blur 半径动画期间可能为 0，
+                // 接近 0 时不再套用 blur 层，避免无意义地占用 RenderEffect。
+                if (blurRadius > 0.5f) modifier.blur(blurRadius.dp) else modifier
+            }
             .graphicsLayer {
                 alpha = lineAlpha
                 scaleX = scale

@@ -105,6 +105,8 @@ fun PhoneLyricsLayout(
     var wordTimingOffsetMs by rememberFloatPreference("wordTimingOffsetMs", 0f)
     var wordScaleSpeed by rememberFloatPreference("wordScaleSpeed", 0.4f)
     var wordScaleSize by rememberFloatPreference("wordScaleSize", 1.0f)
+    var enableLyricBlur by rememberBooleanPreference("enableLyricBlur", true)
+    var lyricBlurIntensity by rememberFloatPreference("lyricBlurIntensity", 0.48f)
     var glowBrightness by rememberFloatPreference("glowBrightness", 0.09f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
@@ -325,7 +327,9 @@ fun PhoneLyricsLayout(
                             yrcFloatIntensity = yrcFloatIntensity,
                             wordTimingOffsetMs = wordTimingOffsetMs,
                             wordScaleSpeed = wordScaleSpeed,
-                            wordScaleSize = wordScaleSize
+                            wordScaleSize = wordScaleSize,
+                            enableLyricBlur = enableLyricBlur,
+                            lyricBlurIntensity = lyricBlurIntensity
                         )
                     }
                     AnimatedVisibility(
@@ -446,6 +450,14 @@ fun PhoneLyricsLayout(
                         SliderSettingItem("逐字偏移", "整体前移或后移逐字时间点，用于校准听感。", wordTimingOffsetMs, { wordTimingOffsetMs = it }, -1000f..1000f, 39),
                         SliderSettingItem("缩放速度", "控制单字放大的追随速度。", wordScaleSpeed, { wordScaleSpeed = it }, 0.1f..2.0f, 10),
                         SliderSettingItem("缩放大小", "控制单字高亮时的最大放大量。", wordScaleSize, { wordScaleSize = it }, 1.0f..2.0f, 13)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "歌词模糊",
+                    description = "当前居中歌词保持清晰，越靠上/下越远越模糊，形成景深效果。",
+                    items = listOf(
+                        SwitchSettingItem("启用歌词模糊", "开启后远离中心位置的歌词会逐渐虚化。", enableLyricBlur, { enableLyricBlur = it }),
+                        SliderSettingItem("模糊强度", "调节远离中心时歌词的虚化程度。", lyricBlurIntensity, { lyricBlurIntensity = it }, 0.0f..1.0f, 20)
                     )
                 )
             ),

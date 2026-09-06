@@ -87,6 +87,8 @@ fun TabletLyricsLayout(
     var wordTimingOffsetMs by rememberFloatPreference("wordTimingOffsetMs", 0f)
     var wordScaleSpeed by rememberFloatPreference("wordScaleSpeed", 0.27f)
     var wordScaleSize by rememberFloatPreference("wordScaleSize", 1.0f)
+    var enableLyricBlur by rememberBooleanPreference("enableLyricBlur", true)
+    var lyricBlurIntensity by rememberFloatPreference("lyricBlurIntensity", 0.48f)
     var glowBrightness by rememberFloatPreference("glowBrightness", 0.09f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
@@ -365,7 +367,9 @@ fun TabletLyricsLayout(
                     yrcFloatIntensity = yrcFloatIntensity,
                     wordTimingOffsetMs = wordTimingOffsetMs,
                     wordScaleSpeed = wordScaleSpeed,
-                    wordScaleSize = wordScaleSize
+                    wordScaleSize = wordScaleSize,
+                    enableLyricBlur = enableLyricBlur,
+                    lyricBlurIntensity = lyricBlurIntensity
                 )
             }
 
@@ -472,6 +476,14 @@ fun TabletLyricsLayout(
                         SliderSettingItem("进度条X", "微调进度条的水平位置。", progressBarOffsetX, { progressBarOffsetX = it }, -200f..200f, 0),
                         SliderSettingItem("进度条Y", "微调进度条的垂直位置。", progressBarOffsetY, { progressBarOffsetY = it }, -200f..200f, 0),
                         SliderSettingItem("进度条宽", "缩放进度条宽度，匹配不同平板比例。", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17)
+                    )
+                ),
+                SliderSettingSection(
+                    title = "歌词模糊",
+                    description = "当前居中歌词保持清晰，越靠上/下越远越模糊，形成景深效果。",
+                    items = listOf(
+                        SwitchSettingItem("启用歌词模糊", "开启后远离中心位置的歌词会逐渐虚化。", enableLyricBlur, { enableLyricBlur = it }),
+                        SliderSettingItem("模糊强度", "调节远离中心时歌词的虚化程度。", lyricBlurIntensity, { lyricBlurIntensity = it }, 0.0f..1.0f, 20)
                     )
                 )
             ),

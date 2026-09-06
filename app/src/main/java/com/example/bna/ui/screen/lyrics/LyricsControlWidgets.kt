@@ -664,7 +664,7 @@ fun LyricsSettingsBottomSheet(
 
 private fun formatSliderValue(label: String, value: Float): String {
     return when {
-        label.contains("亮度") -> String.format(java.util.Locale.US, "%.0f%%", value * 100)
+        label.contains("亮度") || label.contains("强度") -> String.format(java.util.Locale.US, "%.0f%%", value * 100)
         label.contains("频率") -> if (value < 0.01f) "关闭" else String.format(java.util.Locale.US, "%.1fHz", value)
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
@@ -678,7 +678,7 @@ private fun formatSliderValue(label: String, value: Float): String {
 
 private fun formatSliderEdgeValue(label: String, value: Float): String {
     return when {
-        label.contains("亮度") -> String.format(java.util.Locale.US, "%.0f%%", value * 100)
+        label.contains("亮度") || label.contains("强度") -> String.format(java.util.Locale.US, "%.0f%%", value * 100)
         label.contains("频率") -> if (value < 0.01f) "关闭" else String.format(java.util.Locale.US, "%.1fHz", value)
         label.contains("X") || label.contains("Y") -> String.format(java.util.Locale.US, "%.0f", value)
         label.contains("偏移") -> String.format(java.util.Locale.US, "%+.0fms", value)
