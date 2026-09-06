@@ -230,10 +230,6 @@ object MusicPlayer {
 
     fun playPrevious() {
         val player = _exoPlayer ?: return
-        if (player.currentPosition > 3_000L) {
-            player.seekTo(0)
-            return
-        }
 
         if (playbackMode == PlaybackMode.SHUFFLE) {
             val previousIndex = consumeShufflePreviousIndex()

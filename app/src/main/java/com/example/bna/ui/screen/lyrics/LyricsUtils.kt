@@ -147,7 +147,7 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("beatGlowDelayMs", 352.9f)
     ),
     "歌词显示" to listOf(
-        LyricsSettingDef("translationFontSize", 30f)
+        LyricsSettingDef("translationFontSize", 20f)
     ),
     "歌词动画" to listOf(
         LyricsSettingDef("verticalScrollSpeed", 0.5f),

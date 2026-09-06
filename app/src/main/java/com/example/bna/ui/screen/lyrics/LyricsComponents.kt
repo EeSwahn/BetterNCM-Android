@@ -212,7 +212,7 @@ fun LyricLineItem(
         MusicPlayer.playerState.map { it.isPlaying }.distinctUntilChanged()
     }.collectAsState(initial = MusicPlayer.playerState.value.isPlaying)
     val showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
-    val translationFontSizePref by rememberFloatPreference("translationFontSize", 30f)
+    val translationFontSizePref by rememberFloatPreference("translationFontSize", 20f)
     val playerState by MusicPlayer.playerState.collectAsState()
     val animationConfig = rememberLyricsAnimationConfig()
 
@@ -220,7 +220,22 @@ fun LyricLineItem(
     val baseActiveFontSize = if (isPhone) 26f else 44f
     val baseActiveLineHeight = if (isPhone) 36f else 60f
     val inactiveScale = if (isPhone) 16f / 26f else 26f / 44f
-    val targetScale = if (isCurrent) activeLyricSizeRatio else inactiveScale
+
+    // 布局（换行）用字号必须是常量，放大/缩小只能通过 graphicsLayer 的可视缩放实现；
+    // 否则字号随动画变化会触发文字重新换行，导致放大动画中每一行词的个数突然改变。
+    // 因此这里：以“活动行的目标字号”作为统一布局字号（fontSize/lineHeight 常量），
+    // 活动行缩放为 1.0（正好铺满其布局行，无多余上下空隙），
+    // 非活动行用 inactiveVisualScale 整体缩小到更小的视觉字号。
+    val baseFont = (baseFontSizeRatio * baseActiveFontSize).coerceIn(8f, 72f)
+    val layoutFontSize = (baseFont * activeLyricSizeRatio).coerceIn(8f, 72f) // 活动行显示字号（常量）
+    val layoutLineHeight = (layoutFontSize * (baseActiveLineHeight / baseActiveFontSize)).coerceIn(12f, 96f)
+    // 非活动行希望显示的字号 = 原 baseFont * inactiveScale（如 44→26）
+    val inactiveDisplay = (baseFont * inactiveScale).coerceIn(8f, 72f)
+    val inactiveVisualScale = if (layoutFontSize > 0f) {
+        (inactiveDisplay / layoutFontSize).coerceIn(0.3f, 1f)
+    } else inactiveScale
+
+    val targetScale = if (isCurrent) 1f else inactiveVisualScale
 
     val scale by animateFloatAsState(
         targetValue = targetScale,
@@ -228,8 +243,9 @@ fun LyricLineItem(
         label = "scale"
     )
 
-    val fontSize = (baseFontSizeRatio * baseActiveFontSize).coerceIn(8f, 72f)
-    val lineHeight = (baseFontSizeRatio * baseActiveLineHeight).coerceIn(12f, 96f)
+    // 换行用常量字号：放大动画期间文字不会重新断行，每行词数稳定。
+    val fontSize = layoutFontSize
+    val lineHeight = layoutLineHeight
     val wordsToUse by remember(line.words) { mutableStateOf(line.words ?: emptyList()) }
     val usesWordByWordFlow = enableWordByWord && wordsToUse.isNotEmpty() && wordsToUse.size <= 50
 
