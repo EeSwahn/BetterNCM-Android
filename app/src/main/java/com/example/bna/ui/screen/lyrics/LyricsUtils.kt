@@ -139,7 +139,7 @@ data class LyricsSettingDef(val key: String, val defaultValue: Float)
 
 val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = listOf(
     "封面发光" to listOf(
-        LyricsSettingDef("glowBrightness", 0.09f),
+        LyricsSettingDef("glowBrightness", 0f),
         LyricsSettingDef("glowBreathFrequency", 0.5f),
         LyricsSettingDef("glowScaleSize", 1.3f),
         LyricsSettingDef("rightEdgeGlowRadius", 98.0f),
@@ -178,15 +178,18 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("coverPosY", 4.578991f),
         LyricsSettingDef("audioSpecPosX", -0.27659988f),
         LyricsSettingDef("audioSpecPosY", 4.2480392f),
+        LyricsSettingDef("progressPosX", 0f),
+        LyricsSettingDef("progressPosY", 3.2551765f),
+        LyricsSettingDef("progressBarWidthRatio", 1.2444445f),
         LyricsSettingDef("playbackPosX", -0.16628647f),
         LyricsSettingDef("playbackPosY", -0.49563217f)
     ),
     "右侧布局校准" to listOf(
         LyricsSettingDef("lyricsPanelPosX", 0f),
-        LyricsSettingDef("lyricsPanelPosY", 0f),
-        LyricsSettingDef("progressPosX", 0f),
-        LyricsSettingDef("progressPosY", 3.2551765f),
-        LyricsSettingDef("progressBarWidthRatio", 1.2444445f)
+        LyricsSettingDef("lyricsPanelPosY", 0f)
+    ),
+    "播放列表" to listOf(
+        LyricsSettingDef("playlistOpenThreshold", 0.15f)
     )
 )
 

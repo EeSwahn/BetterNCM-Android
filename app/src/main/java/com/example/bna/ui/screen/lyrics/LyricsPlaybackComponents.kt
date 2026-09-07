@@ -13,10 +13,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -305,6 +306,10 @@ fun PlaylistOverlayPanel(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            // 手机/平板：面板高度都占满所在区域，歌单用 weight 填满到面板底，显示更多歌；
+            // navigationBarsPadding 让底部避开系统导航栏，末行歌曲不再被遮挡/截断。
+            .fillMaxHeight()
+            .navigationBarsPadding()
             .padding(horizontal = if (isPhone) 12.dp else 28.dp)
             .padding(bottom = if (isPhone) 20.dp else 32.dp)
             .nestedScroll(closeNested)
@@ -416,7 +421,9 @@ fun PlaylistOverlayPanel(
             state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = if (isPhone) 420.dp else 560.dp),
+                // 手机/平板统一：填满 header 下方余下空间到面板底部（weight 由外层 Column 提供有界高度），
+                // 不再限死 420dp，可滚动且底部不再被截断。
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 12.dp)
         ) {

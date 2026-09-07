@@ -70,10 +70,23 @@ fun TabletLyricsLayout(
     var maxOpenPx by remember { mutableStateOf(0f) }
     val dragScope = rememberCoroutineScope()
 
+    // 播放列表面板「打开判定阈值」：双向对称判定——
+    // 从关闭上划：上划量超过 maxOpenPx 的该比例才保持展开，否则弹回关闭；
+    // 从全开下滑（列表页顶部/底部下拖关闭）：下滑量超过该比例才真正关闭，否则吸回全开。
+    var playlistOpenThreshold by rememberFloatPreference("playlistOpenThreshold", 0.15f)
+    // 本次手势从哪端开始：true=从“全开面板”往下拖(关闭方向)；false=从“关闭”往上划(打开方向)。
+    var dragFromTop by remember { mutableStateOf(false) }
+
     fun settle() {
         val limit = maxOpenPx
         if (limit <= 0f) return
-        val target = if (openPx > limit * 0.45f) limit else 0f
+        val target = if (dragFromTop) {
+            // 下滑关闭：需下拖超过阈值（openPx 降到 (1-t)*limit 以下）才关闭
+            if (openPx < limit * (1f - playlistOpenThreshold)) 0f else limit
+        } else {
+            // 上划打开：需上划超过阈值才全开
+            if (openPx > limit * playlistOpenThreshold) limit else 0f
+        }
         dragScope.launch {
             val a = Animatable(openPx)
             a.animateTo(target, animationSpec = tween(300)) { openPx = value }
@@ -117,7 +130,7 @@ fun TabletLyricsLayout(
     var wordScaleSize by rememberFloatPreference("wordScaleSize", 1.0f)
     var enableLyricBlur by rememberBooleanPreference("enableLyricBlur", true)
     var lyricBlurIntensity by rememberFloatPreference("lyricBlurIntensity", 0.48f)
-    var glowBrightness by rememberFloatPreference("glowBrightness", 0.09f)
+    var glowBrightness by rememberFloatPreference("glowBrightness", 0f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
     var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", false)
@@ -247,6 +260,7 @@ fun TabletLyricsLayout(
                     // 手指上划多少就跟手上移多少；松手超过阈值自动吸附打开/否则弹回
                     .pointerInput(Unit) {
                         detectVerticalDragGestures(
+                            onDragStart = { dragFromTop = false },
                             onVerticalDrag = { change, dragAmount ->
                                 change.consume()
                                 openPx = (openPx - dragAmount).coerceIn(0f, maxOpenPx)
@@ -410,7 +424,10 @@ fun TabletLyricsLayout(
                             playerState = ps,
                             isPhone = false,
                             onClose = { snapClosed() },
-                            onDownDrag = { d -> openPx = (openPx - d).coerceIn(0f, maxOpenPx) },
+                            onDownDrag = { d ->
+                                dragFromTop = true
+                                openPx = (openPx - d).coerceIn(0f, maxOpenPx)
+                            },
                             onDownDragEnd = { settle() }
                         )
                     }
@@ -521,6 +538,13 @@ fun TabletLyricsLayout(
                     )
                 ),
                 SliderSettingSection(
+                    title = "播放列表",
+                    description = "控制左栏封面内容上划展开播放列表的判定与行为。",
+                    items = listOf(
+                        SliderSettingItem("打开判定阈值", "双向生效：上划超过该比例才展开；在播放列表页顶部/底部下滑超过该比例才关闭，否则弹回/吸回。", playlistOpenThreshold, { playlistOpenThreshold = it }, 0.1f..0.9f, 15)
+                    )
+                ),
+                SliderSettingSection(
                     title = "左侧布局校准",
                     description = "X/Y 以占所在列宽/列高的百分比来微调相对位置（0 为基准落位），不同屏幕下表现一致。",
                     items = listOf(
@@ -531,6 +555,9 @@ fun TabletLyricsLayout(
                         SliderSettingItem("封面Y", "封面相对列高的垂直百分比偏移。", coverPosY, { coverPosY = it }, -50f..50f, 0),
                         SliderSettingItem("音质X", "音质文本相对列宽的水平百分比偏移。", audioSpecPosX, { audioSpecPosX = it }, -50f..50f, 0),
                         SliderSettingItem("音质Y", "音质文本相对列高的垂直百分比偏移。", audioSpecPosY, { audioSpecPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("进度条X", "进度条相对列宽的水平百分比偏移。", progressPosX, { progressPosX = it }, -50f..50f, 0),
+                        SliderSettingItem("进度条Y", "进度条相对列高的垂直百分比偏移。", progressPosY, { progressPosY = it }, -50f..50f, 0),
+                        SliderSettingItem("进度条宽", "缩放进度条宽度，匹配不同平板比例。", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17),
                         SliderSettingItem("控制X", "播放控制区相对列宽的水平百分比偏移。", playbackPosX, { playbackPosX = it }, -50f..50f, 0),
                         SliderSettingItem("控制Y", "播放控制区相对列高的垂直百分比偏移。", playbackPosY, { playbackPosY = it }, -50f..50f, 0)
                     )
@@ -540,10 +567,7 @@ fun TabletLyricsLayout(
                     description = "X/Y 以占所在列宽/列高的百分比来微调，适配不同平板比例。",
                     items = listOf(
                         SliderSettingItem("歌词X", "歌词面板相对列宽的水平百分比偏移。", lyricsPanelPosX, { lyricsPanelPosX = it }, -50f..50f, 0),
-                        SliderSettingItem("歌词Y", "歌词面板相对列高的垂直百分比偏移。", lyricsPanelPosY, { lyricsPanelPosY = it }, -50f..50f, 0),
-                        SliderSettingItem("进度条X", "进度条相对列宽的水平百分比偏移。", progressPosX, { progressPosX = it }, -50f..50f, 0),
-                        SliderSettingItem("进度条Y", "进度条相对列高的垂直百分比偏移。", progressPosY, { progressPosY = it }, -50f..50f, 0),
-                        SliderSettingItem("进度条宽", "缩放进度条宽度，匹配不同平板比例。", progressBarWidthRatio, { progressBarWidthRatio = it }, 0.3f..2.0f, 17)
+                        SliderSettingItem("歌词Y", "歌词面板相对列高的垂直百分比偏移。", lyricsPanelPosY, { lyricsPanelPosY = it }, -50f..50f, 0)
                     )
                 ),
                 SliderSettingSection(
