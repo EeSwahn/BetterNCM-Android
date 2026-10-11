@@ -209,7 +209,8 @@ fun PhoneLyricsLayout(
 
     Box(modifier = Modifier.fillMaxSize()) {
         var audioAmplitude by remember { mutableStateOf(0f) }
-        LaunchedEffect(Unit) {
+        LaunchedEffect(enableEdgeGlow) {
+            if (!enableEdgeGlow) return@LaunchedEffect
             val history = mutableListOf<Pair<Long, Float>>()
             while (true) {
                 val now = System.currentTimeMillis()

@@ -45,8 +45,23 @@ fun LoginScreen(
 ) {
     val uiState by loginViewModel.uiState.collectAsState()
 
+    // 挂载时强制把本 ViewModel 复位为「未登录」视图。
+    //
+    // 该 ViewModel 是 Activity 作用域的，启动时若检测到 MUSIC_U 会把 isLoggedIn 置为 true。
+    // 进入登录页通常意味着用户已退出（或登录态已失效），此时那份 true 是陈旧值：
+    // 若直接让它参与下面的导航判断，本页会在首帧就回调 onLoginSuccess() 弹回主界面
+    // —— 即「登录页闪一下就没了」。复位后再由真实的登录动作把它置回 true。
+    LaunchedEffect(Unit) {
+        if (!loginViewModel.hasActiveSession()) {
+            loginViewModel.onLoggedOut()
+        }
+    }
+
+    // 仅在「本次会话内确实登录成功」时才跳转（用 Cookie 兜底校验，避免陈旧状态误触发）
     LaunchedEffect(uiState.isLoggedIn) {
-        if (uiState.isLoggedIn) onLoginSuccess()
+        if (uiState.isLoggedIn && loginViewModel.hasActiveSession()) {
+            onLoginSuccess()
+        }
     }
 
     Box(

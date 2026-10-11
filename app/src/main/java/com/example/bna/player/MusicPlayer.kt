@@ -94,7 +94,7 @@ object MusicPlayer {
                         progressJob?.cancel()
                         progressJob = scope.launch {
                             while (true) {
-                                syncPlayerState(currentPosition = currentPosition)
+                                _playerState.value = _playerState.value.copy(currentPosition = currentPosition)
                                 delay(32L) // Approx ~30+ fps update rate
                             }
                         }

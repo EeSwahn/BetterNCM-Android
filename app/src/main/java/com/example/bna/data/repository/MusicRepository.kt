@@ -1,5 +1,6 @@
 package com.example.bna.data.repository
 
+import com.example.bna.data.cache.MusicCache
 import com.example.bna.data.model.*
 import com.example.bna.data.network.ApiClient
 import com.example.bna.util.NeteaseCrypto
@@ -13,6 +14,21 @@ sealed class Result<out T> {
     data class Error(val message: String, val code: Int = -1) : Result<Nothing>()
     object Loading : Result<Nothing>()
 }
+
+/**
+ * 带来源标记的结果，用于「缓存优先」的读取路径。
+ *
+ * @param fromCache 本次数据是否来自缓存
+ * @param isStale   是否已过期（通常配合后台刷新使用）
+ */
+data class CachedResult<T>(
+    val value: T,
+    val fromCache: Boolean,
+    val isStale: Boolean
+)
+
+/** 歌单加载失败（供缓存路径抛出，避免嵌套 Result）。 */
+class PlaylistLoadException(message: String) : Exception(message)
 
 class MusicRepository {
 
@@ -139,17 +155,32 @@ class MusicRepository {
             }
         }
 
+    /**
+     * 退出登录。
+     *
+     * 顺序很关键（这是「登录页闪一下就没了」的根因）：
+     * 1. 先 `beginLogout()` —— 置位退出标志并立即清 Cookie。标志会让 [ApiClient] 的
+     *    拦截器在整个退出期间拒绝落盘任何 `Set-Cookie`；
+     * 2. 再调服务端 `/weapi/logout` 作废会话（失败也无所谓，本地已经清了）；
+     * 3. 最后 `endLogout()` 复位标志，并再清一次兜底。
+     *
+     * 修复前是「先请求、后清 Cookie」，而该请求自身会经过拦截器，其响应里的
+     * `Set-Cookie: MUSIC_U=...` 会把刚清掉的登录态**又写回来**，导致退出实际未生效。
+     */
     suspend fun logout(): Result<Unit> =
         withContext(Dispatchers.IO) {
+            ApiClient.beginLogout()
             try {
                 val enc = weapi(emptyMap())
                 api.logout(enc["params"]!!, enc["encSecKey"]!!)
-                ApiClient.clearCookie()
-                Result.Success(Unit)
             } catch (e: Exception) {
+                // 服务端作废失败不影响本地退出
+                println("DEBUG Repository: server logout failed (ignored): ${e.message}")
+            } finally {
                 ApiClient.clearCookie()
-                Result.Success(Unit)
+                ApiClient.endLogout()
             }
+            Result.Success(Unit)
         }
 
     // QR 登录
@@ -257,6 +288,220 @@ class MusicRepository {
                 Result.Error("连接失败: ${e.message ?: "未知错误"}")
             }
         }
+
+    // ========== 歌单 ==========
+
+    /**
+     * 获取指定用户的歌单列表。
+     *
+     * 契约来自 NeteaseCloudMusicApiEnhanced `module/user_playlist.js`：
+     * ```js
+     * data = { uid, limit: query.limit || 30, offset: query.offset || 0, includeVideo: true }
+     * request('/api/user/playlist', data, 'weapi')
+     * ```
+     * 本方法分页拉取直到 `more == false`（默认上限 5 页 / 每页 100，足够覆盖常见账号）。
+     */
+    suspend fun getUserPlaylists(
+        uid: Long,
+        limit: Int = 100,
+        fetchAll: Boolean = true
+    ): Result<List<Playlist>> =
+        withContext(Dispatchers.IO) {
+            try {
+                val all = mutableListOf<Playlist>()
+                var offset = 0
+                var page = 0
+                val maxPages = 5
+                while (true) {
+                    val data = mapOf(
+                        "uid" to uid.toString(),
+                        "limit" to limit.toString(),
+                        "offset" to offset.toString(),
+                        "includeVideo" to "true"
+                    )
+                    val enc = weapi(data)
+                    val response = api.getUserPlaylist(enc["params"]!!, enc["encSecKey"]!!)
+                    if (!response.isSuccessful) {
+                        if (all.isEmpty()) {
+                            return@withContext Result.Error("获取歌单失败: ${response.code()}", response.code())
+                        }
+                        break
+                    }
+                    val body = response.body() ?: break
+                    all += body.playlist.orEmpty()
+                    page++
+                    val more = body.more
+                    if (!fetchAll || !more || page >= maxPages) break
+                    offset += limit
+                }
+
+                // 「我喜欢的音乐」置顶，其余保持服务端顺序
+                val sorted = all.sortedByDescending { it.isLikedPlaylist }
+                Result.Success(sorted)
+            } catch (e: Exception) {
+                Result.Error("连接失败: ${e.message ?: "未知错误"}")
+            }
+        }
+
+    /**
+     * 获取当前登录用户的歌单列表（uid 取自已保存的登录信息）。
+     *
+     * 注意：uid 本身**不缓存**（必须先从登录态拿到 uid 才知道缓存 key 与账号归属）；
+     * 歌单列表结果按 uid 缓存。
+     */
+    suspend fun getMyPlaylists(): Result<List<Playlist>> {
+        val status = getLoginStatus()
+        return when (status) {
+            is Result.Success -> {
+                // 官方直连时 account/profile 在顶层；兼容 data 包裹形态（见 LoginStatusResponse）
+                val uid = status.data.userId
+                if (uid == null) {
+                    Result.Error("未获取到登录用户信息，请重新登录")
+                } else {
+                    getUserPlaylists(uid)
+                }
+            }
+            is Result.Error -> Result.Error(status.message, status.code)
+            else -> Result.Error("未登录")
+        }
+    }
+
+    /**
+     * 用户歌单列表的缓存版读取。
+     *
+     * @param allowStale 允许过期时先回显旧数据
+     * @param forceRefresh 忽略缓存强制走网络
+     */
+    suspend fun getMyPlaylistsCached(
+        allowStale: Boolean = true,
+        forceRefresh: Boolean = false
+    ): CachedResult<List<Playlist>> = withContext(Dispatchers.IO) {
+        // 先确认 uid（登录态不缓存）
+        val status = getLoginStatus()
+        val uid = when (status) {
+            is Result.Success -> status.data.userId
+            is Result.Error -> throw PlaylistLoadException(status.message)
+            else -> null
+        } ?: throw PlaylistLoadException("未获取到登录用户信息，请重新登录")
+
+        if (!forceRefresh) {
+            val hit = MusicCache.readMyPlaylists(uid)
+            if (hit != null && (hit.isFresh || allowStale)) {
+                return@withContext CachedResult(hit.value, fromCache = true, isStale = !hit.isFresh)
+            }
+        }
+
+        when (val r = getUserPlaylists(uid)) {
+            is Result.Success -> {
+                MusicCache.writeMyPlaylists(uid, r.data)
+                CachedResult(r.data, fromCache = false, isStale = false)
+            }
+            is Result.Error -> {
+                val stale = MusicCache.readMyPlaylists(uid)
+                if (stale != null) {
+                    CachedResult(stale.value, fromCache = true, isStale = true)
+                } else {
+                    throw PlaylistLoadException(r.message)
+                }
+            }
+            else -> throw PlaylistLoadException("加载失败")
+        }
+    }
+
+    /**
+     * 获取歌单内全部歌曲（**带缓存**）。
+     *
+     * 两步（对齐 api-enhanced `module/playlist_track_all.js`）：
+     * 1. `playlist/detail`（`/api/v6/playlist/detail`）拿 `trackIds[]` 全量 ID；
+     * 2. `song/detail`（`/api/v3/song/detail`，参数 `c=[{"id":...}]`）批量换歌曲详情。
+     *
+     * 实测：id=1 的 trackIds 有 158 条，而 `tracks` 只含前段，故必须走此两步。
+     * 歌曲详情接口每次最多 1000 个 ID，这里按 500 分批。
+     *
+     * 缓存：命中直连返回；过期则**先返回旧数据**（调用方可用 [forceRefresh] 拿新数据）。
+     */
+    suspend fun getPlaylistSongs(playlistId: Long, limit: Int = 1000): Result<List<Song>> =
+        withContext(Dispatchers.IO) {
+            fetchPlaylistSongs(playlistId, limit)
+        }
+
+    /**
+     * 取歌单歌曲，区分「缓存」与「网络」两条来源。
+     *
+     * @param allowStale 允许在缓存过期时先回显旧数据（用于秒开 + 后台刷新）
+     * @param forceRefresh 忽略缓存强制走网络
+     */
+    suspend fun getPlaylistSongsCached(
+        playlistId: Long,
+        limit: Int = 1000,
+        allowStale: Boolean = true,
+        forceRefresh: Boolean = false
+    ): CachedResult<List<Song>> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            val hit = MusicCache.readPlaylistSongs(playlistId)
+            if (hit != null && (hit.isFresh || allowStale)) {
+                return@withContext CachedResult(
+                    value = hit.value,
+                    fromCache = true,
+                    isStale = !hit.isFresh
+                )
+            }
+        }
+        when (val r = fetchPlaylistSongs(playlistId, limit)) {
+            is Result.Success -> {
+                MusicCache.writePlaylistSongs(playlistId, r.data)
+                CachedResult(r.data, fromCache = false, isStale = false)
+            }
+            is Result.Error -> {
+                // 网络失败时兜底用过期缓存，避免用户看到空白
+                val stale = MusicCache.readPlaylistSongs(playlistId)
+                if (stale != null) {
+                    CachedResult(stale.value, fromCache = true, isStale = true)
+                } else {
+                    throw PlaylistLoadException(r.message)
+                }
+            }
+            else -> throw PlaylistLoadException("加载失败")
+        }
+    }
+
+    /** 纯网络获取（缓存未命中或强制刷新时走这里）。 */
+    private suspend fun fetchPlaylistSongs(playlistId: Long, limit: Int): Result<List<Song>> {
+        return try {
+            val detailEnc = weapi(
+                mapOf(
+                    "id" to playlistId.toString(),
+                    "n" to "100000",
+                    "s" to "8"
+                )
+            )
+            val detailResp = api.getPlaylistDetail(detailEnc["params"]!!, detailEnc["encSecKey"]!!)
+            if (!detailResp.isSuccessful) {
+                return Result.Error("获取歌单详情失败: ${detailResp.code()}", detailResp.code())
+            }
+            val detail = detailResp.body()?.playlist
+                ?: return Result.Error("歌单数据为空")
+
+            val ids = detail.trackIds.orEmpty().map { it.id }.take(limit)
+            if (ids.isEmpty()) {
+                // 回退：极少数歌单 detail 不返回 trackIds，此时只能用内嵌 tracks
+                return Result.Success(detail.tracks.orEmpty())
+            }
+
+            val songs = mutableListOf<Song>()
+            ids.chunked(500).forEach { chunk ->
+                val c = chunk.joinToString(prefix = "[", postfix = "]") { "{\"id\":$it}" }
+                val enc = weapi(mapOf("c" to c))
+                val resp = api.getSongDetail(enc["params"]!!, enc["encSecKey"]!!)
+                if (resp.isSuccessful) {
+                    songs += resp.body()?.songs.orEmpty()
+                }
+            }
+            Result.Success(songs)
+        } catch (e: Exception) {
+            Result.Error("连接失败: ${e.message ?: "未知错误"}")
+        }
+    }
 
     // ========== 播放 ==========
 

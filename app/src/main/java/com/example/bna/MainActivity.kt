@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.bna.data.cache.MusicCache
 import com.example.bna.data.network.ApiClient
 import com.example.bna.service.MusicService
 import com.example.bna.ui.screen.LoginScreen
@@ -25,6 +26,9 @@ class MainActivity : ComponentActivity() {
 
         // 初始化 ApiClient（SharedPrefs），加载已保存的 Cookie 和 Base URL
         ApiClient.init(this)
+
+        // 初始化歌曲/歌单两级缓存（内存 LRU + 磁盘 JSON）
+        MusicCache.init(this)
 
         // 启动播放后台服务
         val serviceIntent = Intent(this, MusicService::class.java)

@@ -50,6 +50,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.bna.data.model.LyricLine
 import com.example.bna.player.MusicPlayer
+import com.example.bna.player.PlayerState
+import com.example.bna.data.model.WordInfo
+import androidx.compose.runtime.State
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.animation.core.snap
+import androidx.compose.runtime.derivedStateOf
 import com.example.bna.ui.animation.LyricsAnimationConfig
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -221,7 +227,18 @@ fun LyricLineItem(
     }.collectAsState(initial = MusicPlayer.playerState.value.isPlaying)
     val showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
     val translationFontSizePref by rememberFloatPreference("translationFontSize", 20f)
-    val playerState by MusicPlayer.playerState.collectAsState()
+    // 逐字动画进度由“帧同步的播放位置”在绘制阶段直接计算，字开始时不触发重组，避免该帧卡顿
+    val framePosition = remember { androidx.compose.runtime.mutableLongStateOf(MusicPlayer.getCurrentPosition()) }
+    LaunchedEffect(isCurrent, enableWordByWord) {
+        if (isCurrent && enableWordByWord) {
+            while (true) {
+                androidx.compose.runtime.withFrameNanos {
+                    framePosition.longValue = MusicPlayer.getCurrentPosition()
+                }
+            }
+        }
+    }
+    val wordPositionProvider: () -> Long = { framePosition.longValue + wordTimingOffsetMs.toLong() }
     val animationConfig = rememberLyricsAnimationConfig()
 
     val animationDuration = (400 / scaleAnimationSpeed).toInt().coerceAtLeast(100)
@@ -293,7 +310,6 @@ fun LyricLineItem(
         animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
         label = "textColor"
     )
-    val effectiveCurrentPosition = playerState.currentPosition + wordTimingOffsetMs.toLong()
 
     Column(
         horizontalAlignment = if (isPhone) Alignment.CenterHorizontally else Alignment.Start,
@@ -349,66 +365,17 @@ fun LyricLineItem(
                     centerLines = isPhone
                 ) {
                     wordsToUse.forEachIndexed { index, word ->
-                        val wordStart = line.timeMs + word.startOffset.toLong()
-                        val wordEnd = wordStart + word.duration.toLong()
-                        val isActive = effectiveCurrentPosition in wordStart until wordEnd
-                        val isPassed = effectiveCurrentPosition >= wordEnd
-                        val isAnimatedWord = isCurrent && (isActive || isPassed)
-                        val isBeforeLine = effectiveCurrentPosition < line.timeMs
-                        val targetWordAlpha = when {
-                            !isCurrent -> pendingWordAlpha
-                            isBeforeLine -> pendingWordAlpha
-                            isAnimatedWord -> 1.0f
-                            else -> pendingWordAlpha
-                        }
-                        val targetWordScale = if (isCurrent && !isBeforeLine && isAnimatedWord) wordScaleSize else 1.0f
-                        val targetTranslationY = if (isCurrent && !isBeforeLine && isAnimatedWord) -maxFloatOffset else 0f
-                        val scaleDuration = (200 / wordScaleSpeed).toInt().coerceAtLeast(50)
-
-                        val wordAlpha by animateFloatAsState(
-                            targetValue = targetWordAlpha,
-                            animationSpec = tween(
-                                durationMillis = (150 / wordScaleSpeed).toInt().coerceAtLeast(50),
-                                easing = FastOutSlowInEasing
-                            ),
-                            label = "wa_${line.timeMs}_${index}"
-                        )
-                        val wordScale by animateFloatAsState(
-                            targetValue = targetWordScale,
-                            animationSpec = tween(durationMillis = scaleDuration, easing = FastOutSlowInEasing),
-                            label = "ws_${line.timeMs}_${index}"
-                        )
-                        val wordTranslationY by animateFloatAsState(
-                            targetValue = targetTranslationY,
-                            animationSpec = tween(durationMillis = scaleDuration, easing = LinearOutSlowInEasing),
-                            label = "wt_${line.timeMs}_${index}"
-                        )
-                        val wordColor by animateColorAsState(
-                            targetValue = when {
-                                !isCurrent -> TextSecondary
-                                isBeforeLine -> TextSecondary
-                                isAnimatedWord -> Color.White
-                                else -> TextSecondary
-                            },
-                            animationSpec = tween(
-                                durationMillis = (150 / wordScaleSpeed).toInt().coerceAtLeast(50)
-                            ),
-                            label = "wc_${line.timeMs}_${index}"
-                        )
-
-                        Text(
-                            text = word.text,
-                            color = wordColor,
-                            fontSize = fontSize.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = lineHeight.sp,
-                            modifier = Modifier
-                                .alpha(wordAlpha)
-                                .graphicsLayer {
-                                    scaleX = wordScale
-                                    scaleY = wordScale
-                                    translationY = wordTranslationY
-                                }
+                        LyricWordItem(
+                            word = word,
+                            index = index,
+                            line = line,
+                            isCurrent = isCurrent,
+                            positionProvider = wordPositionProvider,
+                            maxFloatOffset = maxFloatOffset,
+                            wordScaleSize = wordScaleSize,
+                            wordScaleSpeed = wordScaleSpeed,
+                            fontSize = fontSize,
+                            lineHeight = lineHeight
                         )
                     }
                 }
@@ -463,6 +430,60 @@ fun LyricLineItem(
             )
         }
     }
+}
+
+@Composable
+private fun LyricWordItem(
+    word: WordInfo,
+    index: Int,
+    line: LyricLine,
+    isCurrent: Boolean,
+    positionProvider: () -> Long,
+    maxFloatOffset: Float,
+    wordScaleSize: Float,
+    wordScaleSpeed: Float,
+    fontSize: Float,
+    lineHeight: Float
+) {
+    val wordStart = line.timeMs + word.startOffset.toLong()
+    val riseMs = (200 / wordScaleSpeed).coerceAtLeast(50f)
+    val pendingAlpha = 0.3f
+
+    // 离开当前行时整体回落；进入当前行时立即生效（不再叠加一层渐入）
+    val release = animateFloatAsState(
+        targetValue = if (isCurrent) 1f else 0f,
+        animationSpec = if (isCurrent) snap() else tween(durationMillis = riseMs.toInt(), easing = FastOutSlowInEasing),
+        label = "wr_${line.timeMs}_${index}"
+    )
+    // 0..1 的原始进度：完全由播放位置推出，仅在绘制/布局阶段读取
+    fun rawProgress(): Float {
+        val pos = positionProvider()
+        if (pos < line.timeMs) return 0f
+        return ((pos - wordStart) / riseMs).coerceIn(0f, 1f) * release.value
+    }
+
+    BasicText(
+        text = word.text,
+        style = androidx.compose.ui.text.TextStyle(
+            fontSize = fontSize.sp,
+            fontWeight = FontWeight.Bold,
+            lineHeight = lineHeight.sp
+        ),
+        color = { 
+            val e = FastOutSlowInEasing.transform(rawProgress())
+            androidx.compose.ui.graphics.lerp(TextSecondary, Color.White, e)
+        },
+        modifier = Modifier.graphicsLayer {
+            val p = rawProgress()
+            val e = FastOutSlowInEasing.transform(p)
+            alpha = pendingAlpha + (1f - pendingAlpha) * e
+            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+            val sc = 1f + (wordScaleSize - 1f) * e
+            scaleX = sc
+            scaleY = sc
+            translationY = -maxFloatOffset * LinearOutSlowInEasing.transform(p)
+        }
+    )
 }
 
 @Composable

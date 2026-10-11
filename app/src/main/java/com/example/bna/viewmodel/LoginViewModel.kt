@@ -47,7 +47,17 @@ class LoginViewModel : ViewModel() {
         checkLoginStatus()
     }
 
+    /**
+     * 会话代际号。每次退出登录 +1。
+     *
+     * 用于丢弃「退出前发出、退出后才返回」的异步结果：`checkLoginStatus()` 里有一段
+     * 后台静默校验，若它恰好在 `onLoggedOut()` 之后才回来并写 `isLoggedIn = true`，
+     * 就会把用户又推回主界面。回调写入前先比对代际号即可避免。
+     */
+    private var sessionGeneration: Int = 0
+
     private fun checkLoginStatus() {
+        val generation = sessionGeneration
         viewModelScope.launch {
             val cookie = ApiClient.getCookie()
             val hasMusicU = cookie.contains("MUSIC_U", ignoreCase = true)
@@ -55,6 +65,7 @@ class LoginViewModel : ViewModel() {
             println("DEBUG: checkLoginStatus cookie has MUSIC_U: $hasMusicU")
             
             if (hasMusicU) {
+                if (generation != sessionGeneration) return@launch
                 // 有登录 Cookie，先假定登录有效，立即进入主界面
                 _uiState.value = _uiState.value.copy(
                     isLoggedIn = true,
@@ -64,8 +75,13 @@ class LoginViewModel : ViewModel() {
                 // 后台静默验证
                 try {
                     val result = repository.getLoginStatus()
+                    // 校验返回时若已退出登录，丢弃这次结果
+                    if (generation != sessionGeneration) {
+                        println("DEBUG: checkLoginStatus result discarded (session changed)")
+                        return@launch
+                    }
                     if (result is Result.Success) {
-                        val profile = result.data.data?.profile
+                        val profile = result.data.effectiveProfile
                         if (profile != null) {
                             println("DEBUG Profile: Background login validation: SUCCESS for ${profile.nickname}")
                             _uiState.value = _uiState.value.copy(profile = profile)
@@ -244,6 +260,29 @@ class LoginViewModel : ViewModel() {
             _uiState.value = LoginUiState()
         }
     }
+
+    /**
+     * 退出登录后把本 ViewModel 重置为「未登录」。
+     *
+     * 为什么需要它：本 ViewModel 是 Activity 作用域的，启动时 `checkLoginStatus()` 若发现
+     * 有 MUSIC_U 会把 `isLoggedIn` 置为 true。用户在「音乐搜索」页点退出走的是
+     * `SearchViewModel.logout()`（只清 Cookie），不会碰到这份状态，于是 `isLoggedIn`
+     * 一直是陈旧的 true。`LoginScreen` 首次组合就会因 `isLoggedIn == true` 立即回调
+     * `onLoginSuccess()` 弹回主界面 —— 表现为「登录页闪一下就没了」。
+     *
+     * 所以退出登录时必须显式调用本方法（由 MainScreen 的 logout 流程触发）。
+     */
+    fun onLoggedOut() {
+        // 代际号 +1：丢弃所有在途的登录态校验结果
+        sessionGeneration++
+        qrPollJob?.cancel()
+        qrPollJob = null
+        _uiState.value = LoginUiState()
+    }
+
+    /** 检查当前是否真的已登录（以 Cookie 为准，不信任缓存的 isLoggedIn）。 */
+    fun hasActiveSession(): Boolean =
+        ApiClient.getCookie().contains("MUSIC_U", ignoreCase = true)
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)

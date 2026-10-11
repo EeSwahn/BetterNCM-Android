@@ -34,10 +34,41 @@ data class Profile(
     val signature: String? = null
 )
 
+/**
+ * 登录状态响应。
+ *
+ * ★ 注意响应结构：本项目直连官方 `weapi/w/nuser/account/get`，实测该上游响应把
+ * `account` / `profile` 放在**顶层**（顶层键只有 `code, account, profile`），
+ * **没有 `data` 包裹层**：
+ * ```json
+ * {"code":200,"account":{"id":...},"profile":{"userId":...,"nickname":"..."}}
+ * ```
+ * 而 api-enhanced 的 `module/login_status.js` 会在自家服务里把它重新包一层
+ * `data`（`body.data = {...result.body}`）后才对外返回 —— 两者形状不同。
+ *
+ * 历史上本模型只声明了 `data` 包裹形态，导致直连官方时 `data` 恒为 null、
+ * `profile` 永远取不到，于是歌单区一直提示「未获取到登录用户信息」。
+ * 这里同时保留两套字段并统一由 [profile] / [account] 取值，兼容两种形态。
+ */
 data class LoginStatusResponse(
+    // 官方直连：顶层直接给 account / profile
+    val profile: Profile? = null,
+    val account: Account? = null,
+    // api-enhanced 兼容形态：包在 data 里
     val data: LoginStatusData? = null,
     val code: Int = 0
-)
+) {
+    /** 统一取 profile：优先顶层（官方直连），回退到 data 包裹层。 */
+    val effectiveProfile: Profile? get() = profile ?: data?.profile
+
+    /** 统一取 account：优先顶层（官方直连），回退到 data 包裹层。 */
+    val effectiveAccount: Account? get() = account ?: data?.account
+
+    /** 当前登录用户 id；取不到返回 null。 */
+    val userId: Long?
+        get() = effectiveProfile?.userId?.takeIf { it > 0 }
+            ?: effectiveAccount?.id?.takeIf { it > 0 }
+}
 
 data class LoginStatusData(
     val profile: Profile? = null,
@@ -155,6 +186,82 @@ data class RecommendSongsResponse(
 
 data class RecommendSongsData(
     val dailySongs: List<Song>? = null
+)
+
+// ========== 歌单 ==========
+
+/**
+ * 登录用户歌单列表响应。
+ *
+ * 接口契约来自 NeteaseCloudMusicApiEnhanced（`module/user_playlist.js`）：
+ * `POST /api/user/playlist`（weapi），参数 uid / limit / offset / includeVideo。
+ * 已用本地 api-enhanced 实测（uid=1）确认字段：顶层 `code` / `more` / `playlist[]`。
+ */
+data class UserPlaylistResponse(
+    val code: Int,
+    val more: Boolean = false,
+    val playlist: List<Playlist>? = null
+)
+
+/**
+ * 歌单。
+ *
+ * 字段取自实测 `playlist[]` 元素（67 个键中本项目所需的子集）；
+ * 注意 `trackIds` 在 `/user/playlist` 响应里通常为空数组，
+ * 歌曲列表需另调 `playlist_detail` 拿 `trackIds`（详见 PlaylistTrackAllResponse）。
+ */
+data class Playlist(
+    val id: Long,
+    val name: String,
+    val coverImgUrl: String? = null,
+    val trackCount: Int = 0,
+    val playCount: Long = 0,
+    val description: String? = null,
+    val creator: PlaylistCreator? = null,
+    /** 是否为当前用户「收藏」的歌单（true）而非自己创建（false） */
+    val subscribed: Boolean = false,
+    /** 特殊类型：5 = 我喜欢的音乐 */
+    val specialType: Int = 0,
+    val privacy: Int = 0
+) {
+    /** 封面统一转 https，兼容网易云返回的 http:// 地址 */
+    val coverUrl: String
+        get() = coverImgUrl
+            ?.replace("http://", "https://")
+            ?.let { if (it.startsWith("https")) it else "https:$it" }
+            ?: ""
+
+    /** 是否为「我喜欢的音乐」特殊歌单 */
+    val isLikedPlaylist: Boolean get() = specialType == 5 || id == 0L
+}
+
+data class PlaylistCreator(
+    val userId: Long = 0,
+    val nickname: String? = null,
+    val avatarUrl: String? = null
+)
+
+/**
+ * `playlist_detail` 响应（`module/playlist_detail.js` → `POST /api/v6/playlist/detail`）。
+ * 其中 `trackIds[]` 是歌单内全部歌曲的 ID 序列（实测 id=1 时 158 条），
+ * 而 `tracks` 只含前若干首，所以取全量歌曲必须走 trackIds → song/detail。
+ */
+data class PlaylistDetailResponse(
+    val code: Int,
+    val playlist: PlaylistDetail? = null
+)
+
+data class PlaylistDetail(
+    val id: Long = 0,
+    val name: String? = null,
+    val trackIds: List<PlaylistTrackId>? = null,
+    val tracks: List<Song>? = null
+)
+
+data class PlaylistTrackId(
+    val id: Long,
+    val v: Int = 0,
+    val at: Long = 0
 )
 
 // ========== 歌词 ==========

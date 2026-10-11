@@ -45,6 +45,17 @@ class SearchViewModel : ViewModel() {
         }
     }
 
+    /**
+     * 退出登录并等待完成。
+     *
+     * 供 [com.example.bna.ui.screen.MainScreen] 的退出流程使用：必须等 Cookie 真正清掉
+     * 之后再导航到登录页，否则登录页的 `hasActiveSession()` 会读到尚未清掉的 MUSIC_U
+     * 而立刻弹回主界面（「登录页闪一下就没了」）。
+     */
+    suspend fun logoutAndAwait() {
+        repository.logout()
+    }
+
     fun resetLogoutEvent() {
         _logoutEvent.value = false
     }

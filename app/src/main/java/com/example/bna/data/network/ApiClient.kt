@@ -22,6 +22,30 @@ object ApiClient {
     private var musicAToken: String = ""  // 匿名 MUSIC_A
     private lateinit var prefs: SharedPreferences
 
+    /**
+     * 退出登录进行中的标志。
+     *
+     * 为什么需要它：`POST /weapi/logout` 这个请求本身也要经过 [cookieInterceptor]，
+     * 而拦截器在收到响应后只要发现 `Set-Cookie` 里有 MUSIC_U 就会调 [saveCookie]。
+     * 于是 `repository.logout()` 里「先请求、后 clearCookie」的顺序会被拦截器反打成
+     * 「clearCookie 之后 cookie 又被存回来」——退出登录实际上没生效：
+     * 下次冷启动 / 读 `hasActiveSession()` 仍是已登录，登录页会立刻又跳回主界面
+     * （表现为「登录页闪一下就没了」）。
+     *
+     * 置位期间拦截器不再落盘任何 cookie，退出流程结束后由 [endLogout] 复位。
+     */
+    @Volatile
+    private var loggingOut: Boolean = false
+
+    fun beginLogout() {
+        loggingOut = true
+        clearCookie()
+    }
+
+    fun endLogout() {
+        loggingOut = false
+    }
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences("netease_prefs", Context.MODE_PRIVATE)
         cookieStore = prefs.getString("cookie", "") ?: ""
@@ -156,8 +180,11 @@ object ApiClient {
         val response = chain.proceed(requestBuilder.build())
 
         // 4. 保存 Cookie
+        //
+        // 退出登录期间必须完全跳过：否则 /weapi/logout 的响应会把即将失效的
+        // MUSIC_U 又写回本地，令退出登录「看似成功、实则回滚」（详见 loggingOut 注释）。
         val setCookieHeaders = response.headers("Set-Cookie")
-        if (setCookieHeaders.isNotEmpty()) {
+        if (setCookieHeaders.isNotEmpty() && !loggingOut) {
             val allCookies = setCookieHeaders.joinToString("; ") { it.split(";").first().trim() }
             if (allCookies.contains("MUSIC_U", ignoreCase = true)) {
                 saveCookie(allCookies)

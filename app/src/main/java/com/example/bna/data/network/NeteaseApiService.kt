@@ -108,6 +108,31 @@ interface NeteaseApiService {
         @Field("encSecKey") encSecKey: String
     ): Response<RecommendSongsResponse>
 
+    // ========== 歌单 ==========
+
+    /**
+     * 获取用户歌单。对齐 api-enhanced `module/user_playlist.js`：
+     * `POST /api/user/playlist`（weapi），参数 uid / limit / offset / includeVideo。
+     */
+    @FormUrlEncoded
+    @POST("weapi/user/playlist")
+    suspend fun getUserPlaylist(
+        @Field("params") params: String,
+        @Field("encSecKey") encSecKey: String
+    ): Response<UserPlaylistResponse>
+
+    /**
+     * 歌单详情（含全量 trackIds）。对齐 api-enhanced `module/playlist_detail.js`：
+     * `POST /api/v6/playlist/detail`，参数 id / n / s。
+     * 注意：该接口 api-enhanced 默认用 eapi，但 weapi 同样可用（本应用走 weapi）。
+     */
+    @FormUrlEncoded
+    @POST("weapi/v6/playlist/detail")
+    suspend fun getPlaylistDetail(
+        @Field("params") params: String,
+        @Field("encSecKey") encSecKey: String
+    ): Response<PlaylistDetailResponse>
+
     @FormUrlEncoded
     @POST("weapi/song/lyric")
     suspend fun getLyric(
