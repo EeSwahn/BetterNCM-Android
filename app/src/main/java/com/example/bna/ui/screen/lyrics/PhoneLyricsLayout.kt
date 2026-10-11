@@ -107,6 +107,7 @@ fun PhoneLyricsLayout(
     var activeLyricSizeRatio by rememberFloatPreference("activeLyricSizeRatio", 0.7f)
     var baseFontSizeRatio by rememberFloatPreference("baseFontSizeRatio", 1.3f)
     var lineSpacingRatio by rememberFloatPreference("lineSpacingRatio", 0.7f)
+    var activeLineAnchorRatio by rememberFloatPreference("activeLineAnchorRatio", 0.34f)
     var enableWordByWord by rememberBooleanPreference("enableWordByWord", true)
     var yrcFloatSpeed by rememberFloatPreference("yrcFloatSpeed", 0.3f)
     var yrcFloatIntensity by rememberFloatPreference("yrcFloatIntensity", 12f)
@@ -385,6 +386,7 @@ fun PhoneLyricsLayout(
                             activeLyricSizeRatio = activeLyricSizeRatio,
                             baseFontSizeRatio = baseFontSizeRatio,
                             lineSpacingRatio = lineSpacingRatio,
+                            activeLineAnchorRatio = activeLineAnchorRatio,
                             enableWordByWord = enableWordByWord,
                             yrcFloatSpeed = yrcFloatSpeed,
                             yrcFloatIntensity = yrcFloatIntensity,
@@ -544,7 +546,8 @@ fun PhoneLyricsLayout(
                         SliderSettingItem("缩放速度", "控制当前行进入焦点时的缩放变化速度。", scaleAnimationSpeed, { scaleAnimationSpeed = it }, 0.1f..1.0f, 8),
                         SliderSettingItem("居中放大", "调整当前歌词在视觉中心区域的放大量。", activeLyricSizeRatio, { activeLyricSizeRatio = it }, 0.1f..1.0f, 8),
                         SliderSettingItem("所有字号", "统一放大或缩小整页歌词字号。", baseFontSizeRatio, { baseFontSizeRatio = it }, 0.5f..2.0f, 15),
-                        SliderSettingItem("歌词行距", "控制整段歌词上下呼吸感和密度。", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25)
+                        SliderSettingItem("歌词行距", "控制整段歌词上下呼吸感和密度。", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25),
+                        SliderSettingItem("当前行位置", "当前播放/高亮行在歌词区里的纵向位置。越小越靠上，越大越靠下。", activeLineAnchorRatio, { activeLineAnchorRatio = it }, 0.05f..0.75f, 13)
                     )
                 ),
                 SliderSettingSection(

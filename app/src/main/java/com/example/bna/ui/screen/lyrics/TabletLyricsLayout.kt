@@ -62,6 +62,7 @@ fun TabletLyricsLayout(
     var activeLyricSizeRatio by rememberFloatPreference("activeLyricSizeRatio", 0.7f)
     var baseFontSizeRatio by rememberFloatPreference("baseFontSizeRatio", 1.3f)
     var lineSpacingRatio by rememberFloatPreference("lineSpacingRatio", 0.5f)
+    var activeLineAnchorRatio by rememberFloatPreference("activeLineAnchorRatio", 0.38f)
     var showSettings by remember { mutableStateOf(false) }
 
     // ---- 播放列表「跟手拖拽 + 松手吸附」开合 ----
@@ -113,7 +114,7 @@ fun TabletLyricsLayout(
     var playbackPosX by rememberFloatPreference("playbackPosX", -0.16628647f)
     var playbackPosY by rememberFloatPreference("playbackPosY", -0.49563217f)
     var lyricsPanelPosX by rememberFloatPreference("lyricsPanelPosX", 0f)
-    var lyricsPanelPosY by rememberFloatPreference("lyricsPanelPosY", 0f)
+    var lyricsPanelPosY by rememberFloatPreference("lyricsPanelPosY", 3f)
     var progressPosX by rememberFloatPreference("progressPosX", 0f)
     var progressPosY by rememberFloatPreference("progressPosY", 3.2551765f)
     var progressBarWidthRatio by rememberFloatPreference("progressBarWidthRatio", 1.2444445f)
@@ -452,6 +453,7 @@ fun TabletLyricsLayout(
                     activeLyricSizeRatio = activeLyricSizeRatio,
                     baseFontSizeRatio = baseFontSizeRatio,
                     lineSpacingRatio = lineSpacingRatio,
+                    activeLineAnchorRatio = activeLineAnchorRatio,
                     enableWordByWord = enableWordByWord,
                     yrcFloatSpeed = yrcFloatSpeed,
                     yrcFloatIntensity = yrcFloatIntensity,
@@ -516,7 +518,8 @@ fun TabletLyricsLayout(
                         SliderSettingItem("缩放速度", "当前行高亮时的缩放进入速度。", scaleAnimationSpeed, { scaleAnimationSpeed = it }, 0.1f..1.0f, 8),
                         SliderSettingItem("居中放大", "控制视觉中心处当前歌词的强调程度。", activeLyricSizeRatio, { activeLyricSizeRatio = it }, 0.1f..1.0f, 8),
                         SliderSettingItem("所有字号", "统一缩放歌词字号，快速试不同观感。", baseFontSizeRatio, { baseFontSizeRatio = it }, 0.5f..2.0f, 15),
-                        SliderSettingItem("歌词行距", "让歌词排布更紧凑或更舒展。", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25)
+                        SliderSettingItem("歌词行距", "让歌词排布更紧凑或更舒展。", lineSpacingRatio, { lineSpacingRatio = it }, 0.5f..3.0f, 25),
+                        SliderSettingItem("当前行位置", "当前播放/高亮行在歌词区里的纵向位置。越小越靠上，越大越靠下。", activeLineAnchorRatio, { activeLineAnchorRatio = it }, 0.05f..0.75f, 13)
                     )
                 ),
                 SliderSettingSection(

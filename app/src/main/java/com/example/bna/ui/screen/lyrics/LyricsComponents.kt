@@ -102,7 +102,8 @@ fun LyricsPanel(
     wordScaleSpeed: Float = 1.0f,
     wordScaleSize: Float = 1.3f,
     enableLyricBlur: Boolean = false,
-    lyricBlurIntensity: Float = 1.0f
+    lyricBlurIntensity: Float = 1.0f,
+    activeLineAnchorRatio: Float = if (isPhone) 0.34f else 0.38f
 ) {
     val listState = rememberLazyListState()
 
@@ -139,7 +140,10 @@ fun LyricsPanel(
 
         if (activeItemInfo != null) {
             val activeCenter = activeItemInfo.offset + (activeItemInfo.size / 2)
-            val viewportCenter = (viewportHeight * if (isPhone) 0.34f else 0.38f).toInt()
+            // 当前播放行停留的纵向锚点：viewportHeight 的比例位置（0=顶部，1=底部）。
+            // 由设置面板「当前行位置」滑块调节，值越小当前行越靠上。
+            val viewportCenter = (viewportHeight *
+                activeLineAnchorRatio.coerceIn(0.05f, 0.95f)).toInt()
             val distanceToScroll = activeCenter - viewportCenter
             val duration = (500 / verticalScrollSpeed).toInt().coerceAtLeast(100)
             listState.animateScrollBy(
@@ -169,7 +173,7 @@ fun LyricsPanel(
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(vertical = if (isPhone) 80.dp else 120.dp),
-                horizontalAlignment = if (isPhone) Alignment.CenterHorizontally else Alignment.Start,
+                horizontalAlignment = Alignment.Start,
                 modifier = Modifier.fillMaxSize()
             ) {
                 itemsIndexed(
@@ -312,7 +316,7 @@ fun LyricLineItem(
     )
 
     Column(
-        horizontalAlignment = if (isPhone) Alignment.CenterHorizontally else Alignment.Start,
+        horizontalAlignment = Alignment.Start,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
@@ -338,7 +342,7 @@ fun LyricLineItem(
                 if (animationConfig.enableGlowEffect) modifier.glowEffect(isCurrent = isCurrent, glowColor = Color.White) else modifier
             }
             .padding(
-                horizontal = if (isPhone) 4.dp else 32.dp,
+                horizontal = if (isPhone) 24.dp else 32.dp,
                 vertical = 4.dp * lineSpacingRatio
             )
             .let { modifier ->
@@ -350,7 +354,7 @@ fun LyricLineItem(
                 alpha = lineAlpha
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = if (isPhone) TransformOrigin(0.5f, 0.5f) else TransformOrigin(0f, 0.5f)
+                transformOrigin = TransformOrigin(0f, 0.5f)
             }
     ) {
         if (enableWordByWord) {
@@ -362,7 +366,7 @@ fun LyricLineItem(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp * lineSpacingRatio)
                         .padding(top = (maxFloatOffset / 2).dp),
-                    centerLines = isPhone
+                    centerLines = false
                 ) {
                     wordsToUse.forEachIndexed { index, word ->
                         LyricWordItem(
@@ -385,7 +389,7 @@ fun LyricLineItem(
                     color = textColor,
                     fontSize = fontSize.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = if (isPhone) TextAlign.Center else TextAlign.Start,
+                    textAlign = TextAlign.Start,
                     lineHeight = lineHeight.sp,
                     modifier = Modifier.padding(vertical = 4.dp * lineSpacingRatio)
                 )
@@ -396,7 +400,7 @@ fun LyricLineItem(
                 color = textColor,
                 fontSize = fontSize.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = if (isPhone) TextAlign.Center else TextAlign.Start,
+                textAlign = TextAlign.Start,
                 lineHeight = lineHeight.sp,
                 modifier = Modifier.padding(vertical = 4.dp * lineSpacingRatio)
             )
@@ -422,7 +426,7 @@ fun LyricLineItem(
                 color = translationColor,
                 fontSize = translationFontSize,
                 fontWeight = FontWeight.Bold,
-                textAlign = if (isPhone) TextAlign.Center else TextAlign.Start,
+                textAlign = TextAlign.Start,
                 lineHeight = translationLineHeight,
                 modifier = Modifier
                     .padding(top = 2.dp)

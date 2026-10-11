@@ -154,7 +154,8 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("scaleAnimationSpeed", 0.5f),
         LyricsSettingDef("activeLyricSizeRatio", 0.7f),
         LyricsSettingDef("baseFontSizeRatio", 1.3f),
-        LyricsSettingDef("lineSpacingRatio", 0.5f)
+        LyricsSettingDef("lineSpacingRatio", 0.5f),
+        LyricsSettingDef("activeLineAnchorRatio", 0.38f)
     ),
     "逐字细节" to listOf(
         LyricsSettingDef("yrcFloatSpeed", 2.0f),
@@ -186,7 +187,7 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
     ),
     "右侧布局校准" to listOf(
         LyricsSettingDef("lyricsPanelPosX", 0f),
-        LyricsSettingDef("lyricsPanelPosY", 0f)
+        LyricsSettingDef("lyricsPanelPosY", 3f)
     ),
     "播放列表" to listOf(
         LyricsSettingDef("playlistOpenThreshold", 0.15f)
