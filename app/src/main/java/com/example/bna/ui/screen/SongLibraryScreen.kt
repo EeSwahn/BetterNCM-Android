@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -152,6 +153,29 @@ internal fun SaltTopBar(
     onLogout: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
+    var showLogoutConfirmation by rememberSaveable { mutableStateOf(false) }
+    if (showLogoutConfirmation && onLogout != null) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmation = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = LocalHomeColors.current.surface,
+            title = { Text("退出登录？") },
+            text = { Text("确定要退出当前账号吗？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLogoutConfirmation = false
+                    onLogout()
+                }) {
+                    Text("退出登录", color = LocalHomeColors.current.accent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmation = false }) {
+                    Text("取消", color = Color(0xFFB0B0B0))
+                }
+            }
+        )
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,7 +216,7 @@ internal fun SaltTopBar(
             trailing()
         } else if (onLogout != null) {
             IconButton(
-                onClick = onLogout,
+                onClick = { showLogoutConfirmation = true },
                 modifier = Modifier.size(40.dp).clip(CircleShape)
             ) {
                 Icon(
