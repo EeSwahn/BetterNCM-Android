@@ -161,7 +161,7 @@ val tabletLyricsSettingGroups: List<Pair<String, List<LyricsSettingDef>>> = list
         LyricsSettingDef("glowBrightness", 0f),
         LyricsSettingDef("glowBreathFrequency", 0.5f),
         LyricsSettingDef("glowScaleSize", 1.3f),
-        LyricsSettingDef("rightEdgeGlowRadius", 98.0f),
+        LyricsSettingDef("rightEdgeGlowRadius", 39.0f),
         LyricsSettingDef("beatGlowThreshold", 0.1f),
         LyricsSettingDef("beatGlowDelayMs", 352.9f)
     ),
@@ -217,7 +217,7 @@ val tabletLyricsBooleanSettings: List<Pair<String, Boolean>> = listOf(
     "enableWordByWord" to true,
     "showLyricsTranslation" to true,
     "enableLyricBlur" to true,
-    "enableEdgeGlow" to false
+    "enableEdgeGlow" to true
 )
 
 /**

@@ -120,10 +120,10 @@ fun PhoneLyricsLayout(
     var glowBrightness by rememberFloatPreference("glowBrightness", 0f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
-    var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", false)
+    var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", true)
     var showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
     var translationFontSize by rememberFloatPreference("translationFontSize", 20f)
-    var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 98.0f)
+    var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 39.0f)
     var beatGlowThreshold by rememberFloatPreference("beatGlowThreshold", 0.1f)
     var beatGlowDelayMs by rememberFloatPreference("beatGlowDelayMs", 352.9f)
     var showSettings by remember { mutableStateOf(false) }

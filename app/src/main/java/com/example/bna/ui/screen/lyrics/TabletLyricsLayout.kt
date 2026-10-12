@@ -135,10 +135,10 @@ fun TabletLyricsLayout(
     var glowBrightness by rememberFloatPreference("glowBrightness", 0f)
     var glowBreathFrequency by rememberFloatPreference("glowBreathFrequency", 0.5f)
     var glowScaleSize by rememberFloatPreference("glowScaleSize", 1.3f)
-    var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", false)
+    var enableEdgeGlow by rememberBooleanPreference("enableEdgeGlow", true)
     var showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
     var translationFontSize by rememberFloatPreference("translationFontSize", 20f)
-    var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 98.0f)
+    var rightEdgeGlowRadius by rememberFloatPreference("rightEdgeGlowRadius", 39.0f)
     var beatGlowThreshold by rememberFloatPreference("beatGlowThreshold", 0.1f)
     var beatGlowDelayMs by rememberFloatPreference("beatGlowDelayMs", 352.9f)
 
@@ -248,7 +248,7 @@ fun TabletLyricsLayout(
             val estimatedFixedHeight = 60.dp * uiScale +          // 标题区
                 16.dp +                                            // 音质文本
                 44.dp +                                            // 进度条 + 时间
-                76.dp * uiScale * playbackButtonSizeRatio +        // 播放按钮
+                92.dp * uiScale * playbackButtonSizeRatio +        // 播放按钮
                 28.dp                                              // 安全余量
             val coverCapByHeight = (maxHeight - estimatedFixedHeight - 24.dp * uiScale).coerceAtLeast(48.dp)
             val coverEdge = minOf(idealWidth, coverCapByHeight)

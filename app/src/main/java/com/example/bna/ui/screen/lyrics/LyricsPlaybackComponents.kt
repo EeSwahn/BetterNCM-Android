@@ -1,8 +1,12 @@
 package com.example.bna.ui.screen.lyrics
 
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -50,6 +54,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
@@ -201,15 +213,15 @@ fun PlaybackButtonsOnly(
         val minSpacing = 8.dp
         val baseSpacing = (if (buttonSpacingDp > 0f) buttonSpacingDp.dp else (if (isPhone) 32.dp else 40.dp) * scale)
             .coerceAtLeast(minSpacing)
-        val baseSide = (if (isPhone) 40.dp else 48.dp) * scale * buttonSizeRatio
-        val basePlay = (if (isPhone) 64.dp else 72.dp) * scale * buttonSizeRatio
+        val baseSide = (if (isPhone) 52.dp else 60.dp) * scale * buttonSizeRatio
+        val basePlay = (if (isPhone) 80.dp else 88.dp) * scale * buttonSizeRatio
         val fitScale = if (baseSide * 2 + basePlay + minSpacing * 2 > maxWidth) {
             ((maxWidth - minSpacing * 2) / (baseSide * 2 + basePlay)).coerceIn(0.5f, 1f)
         } else 1f
         val sideSize = baseSide * fitScale
         val playSize = basePlay * fitScale
-        val sideIcon = (if (isPhone) 28.dp else 32.dp) * scale * buttonSizeRatio * fitScale
-        val playIcon = (if (isPhone) 48.dp else 56.dp) * scale * buttonSizeRatio * fitScale
+        val sideIcon = (if (isPhone) 40.dp else 44.dp) * scale * buttonSizeRatio * fitScale
+        val playIcon = (if (isPhone) 64.dp else 72.dp) * scale * buttonSizeRatio * fitScale
         val spacing = ((maxWidth - sideSize * 2 - playSize) / 2).coerceIn(minSpacing, baseSpacing)
 
         Row(
@@ -219,32 +231,67 @@ fun PlaybackButtonsOnly(
         ) {
             IconButton(onClick = { MusicPlayer.playPrevious() }, modifier = Modifier.size(sideSize)) {
                 Icon(
-                    painter = painterResource(R.drawable.salt_ic_skip_previous),
+                    painter = painterResource(R.drawable.player_bold_previous),
                     contentDescription = "上一首",
                     tint = TextPrimary,
                     modifier = Modifier.size(sideIcon)
                 )
             }
 
-            IconButton(onClick = { MusicPlayer.togglePlayPause() }, modifier = Modifier.size(playSize)) {
-                Icon(
-                    painter = painterResource(
-                        if (isPlaying) R.drawable.salt_ic_pause_btn else R.drawable.salt_ic_play_btn
-                    ),
-                    contentDescription = if (isPlaying) "暂停" else "播放",
-                    tint = Color.White,
-                    modifier = Modifier.size(playIcon)
-                )
-            }
+            MorphingPlayPauseButton(
+                isPlaying = isPlaying,
+                buttonSize = playSize,
+                iconSize = playIcon
+            )
 
             IconButton(onClick = { MusicPlayer.playNext() }, modifier = Modifier.size(sideSize)) {
                 Icon(
-                    painter = painterResource(R.drawable.salt_ic_skip_next),
+                    painter = painterResource(R.drawable.player_bold_next),
                     contentDescription = "下一首",
                     tint = Color.White,
                     modifier = Modifier.size(sideIcon)
                 )
             }
+        }
+    }
+}
+
+/** Two halves of one triangle separate into bold pause bars, and rejoin on pause. */
+@Composable
+private fun MorphingPlayPauseButton(isPlaying: Boolean, buttonSize: Dp, iconSize: Dp) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(if (pressed) 0.90f else 1f,
+        tween(if (pressed) 100 else 240, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)),
+        label = "playButtonPress")
+    val morph by animateFloatAsState(if (isPlaying) 1f else 0f,
+        tween(300, easing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)), label = "playPauseMorph")
+    val leftPlay = remember { floatArrayOf(7f, 4f, 12f, 7.077f, 12f, 16.923f, 7f, 20f) }
+    val rightPlay = remember { floatArrayOf(12f, 7.077f, 20f, 12f, 20f, 12f, 12f, 16.923f) }
+    val leftPause = remember { floatArrayOf(5f, 4f, 10f, 4f, 10f, 20f, 5f, 20f) }
+    val rightPause = remember { floatArrayOf(14f, 4f, 19f, 4f, 19f, 20f, 14f, 20f) }
+    val path = remember { Path() }
+    Box(Modifier.size(buttonSize)
+        .semantics { contentDescription = if (isPlaying) "暂停" else "播放" }
+        .clickable(interactionSource = interaction, indication = null, role = Role.Button) {
+            MusicPlayer.togglePlayPause()
+        }, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(iconSize).graphicsLayer { scaleX = pressScale; scaleY = pressScale }) {
+            val unit = size.minDimension / 24f
+            fun drawPart(from: FloatArray, to: FloatArray) {
+                path.reset()
+                for (vertex in 0..3) {
+                    val i = vertex * 2
+                    val x = (from[i] + (to[i] - from[i]) * morph) * unit
+                    val y = (from[i + 1] + (to[i + 1] - from[i + 1]) * morph) * unit
+                    if (vertex == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+                drawPath(path, Color.White)
+                drawPath(path, Color.White, style = Stroke(width = unit * 0.65f, join = StrokeJoin.Round))
+            }
+            drawPart(leftPlay, leftPause)
+            drawPart(rightPlay, rightPause)
         }
     }
 }
