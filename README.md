@@ -54,14 +54,14 @@ A NetEase Cloud Music third-party Android player inspired by BetterNCM
 
 ### Features
 
-- ✅ Real-time **SuiXinChang (karaoke) vocal-volume control** on the 4‑channel PCM mix
-- ✅ **YRC per-word** and **LRC line** lyric rendering with floating / scaling animation
-- ✅ **Dynamic blurred-cover background** with flowing-light ambience
-- ✅ Tablet **left-cover / right-lyrics** immersive layout
-- ✅ **High-refresh (60fps)** lyric progress driven by ms-level audio sync
-- ✅ Background playback with a **foreground-service notification**
-- ✅ Login that simulates an **Android Tablet / PC** identity to skip QR restrictions
-- ⏳ Phone (portrait) layout optimisation — ongoing
+-  Real-time **SuiXinChang (karaoke) vocal-volume control** on the 4‑channel PCM mix
+-  **YRC per-word** and **LRC line** lyric rendering with floating / scaling animation
+-  **Dynamic blurred-cover background** with flowing-light ambience
+-  Tablet **left-cover / right-lyrics** immersive layout
+-  **High-refresh (60fps)** lyric progress driven by ms-level audio sync
+-  Background playback with a **foreground-service notification**
+-  Login that simulates an **Android Tablet / PC** identity to skip QR restrictions
+-  Phone (portrait) layout optimisation — ongoing
 
 ### Download
 
@@ -123,14 +123,14 @@ This project is released under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ### 核心功能
 
-- ✅ **随心唱（卡拉OK式）人声实时音量控制**，基于 4 声道 PCM 混音
-- ✅ **YRC 逐字 / LRC 逐行** 歌词渲染，支持浮动 / 缩放动画
-- ✅ **封面动态模糊背景**，搭配流动光效氛围
-- ✅ 平板 **左封面 / 右大字歌词** 沉浸式布局
-- ✅ 毫秒级音频同步驱动 **60fps 高刷新** 歌词进度
-- ✅ 前台服务 **通知栏控制的后台播放**
-- ✅ 模拟 **安卓平板 / PC** 身份登录，绕开扫码限制
-- ⏳ 手机（竖屏）布局优化 —— 进行中
+-  **随心唱（卡拉OK式）人声实时音量控制**，基于 4 声道 PCM 混音
+-  **YRC 逐字 / LRC 逐行** 歌词渲染，支持浮动 / 缩放动画
+-  **封面动态模糊背景**，搭配流动光效氛围
+-  平板 **左封面 / 右大字歌词** 沉浸式布局
+-  毫秒级音频同步驱动 **60fps 高刷新** 歌词进度
+-  前台服务 **通知栏控制的后台播放**
+-  模拟 **安卓平板 / PC** 身份登录，绕开扫码限制
+-  手机（竖屏）布局优化 —— 进行中
 
 ### 下载体验
 
@@ -158,5 +158,3 @@ This project is released under the **MIT License**. See the [LICENSE](LICENSE) f
 </details>
 
 ---
-
-Made with ❤️ · 仅供学习交流 · Not affiliated with NetEase or BetterNCM
