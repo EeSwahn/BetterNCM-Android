@@ -67,8 +67,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.TextUnit
-import com.example.bna.ui.animation.flowingLightEffect
-import com.example.bna.ui.animation.glowEffect
+import androidx.compose.material3.LocalTextStyle
 import com.example.bna.ui.animation.lyrics3DEffect
 import com.example.bna.ui.animation.rememberLyricsAnimationConfig
 import com.example.bna.ui.theme.NeteaseRed
@@ -106,6 +105,7 @@ fun LyricsPanel(
     activeLineAnchorRatio: Float = if (isPhone) 0.34f else 0.38f
 ) {
     val listState = rememberLazyListState()
+    val currentLineIndex by lyricsViewModel.currentLineIndex.collectAsState()
 
     LaunchedEffect(lyricsState.lyrics.firstOrNull()?.timeMs, lyricsState.lyrics.size) {
         if (lyricsState.lyrics.isNotEmpty()) {
@@ -113,8 +113,8 @@ fun LyricsPanel(
         }
     }
 
-    LaunchedEffect(lyricsState.currentLineIndex) {
-        val activeIndex = lyricsState.currentLineIndex
+    LaunchedEffect(currentLineIndex) {
+        val activeIndex = currentLineIndex
         if (activeIndex < 0) {
             listState.scrollToItem(0)
             return@LaunchedEffect
@@ -180,10 +180,10 @@ fun LyricsPanel(
                     items = lyricsState.lyrics,
                     key = { index, line -> "${line.timeMs}_$index" }
                 ) { index, line ->
-                    val distance = kotlin.math.abs(index - lyricsState.currentLineIndex)
+                    val distance = kotlin.math.abs(index - currentLineIndex)
                     LyricLineItem(
                         line = line,
-                        isCurrent = index == lyricsState.currentLineIndex,
+                        isCurrent = index == currentLineIndex,
                         distance = distance,
                         scaleAnimationSpeed = scaleAnimationSpeed,
                         activeLyricSizeRatio = activeLyricSizeRatio,
@@ -226,9 +226,6 @@ fun LyricLineItem(
     enableLyricBlur: Boolean = false,
     lyricBlurIntensity: Float = 1.0f
 ) {
-    val isPlaying by remember {
-        MusicPlayer.playerState.map { it.isPlaying }.distinctUntilChanged()
-    }.collectAsState(initial = MusicPlayer.playerState.value.isPlaying)
     val showTranslation by rememberBooleanPreference("showLyricsTranslation", true)
     val translationFontSizePref by rememberFloatPreference("translationFontSize", 20f)
     // 逐字动画进度由“帧同步的播放位置”在绘制阶段直接计算，字开始时不触发重组，避免该帧卡顿
@@ -284,7 +281,16 @@ fun LyricLineItem(
         animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
         label = "alpha"
     )
-    val lineAlpha = if (usesWordByWordFlow) 1f else animatedLineAlpha
+
+    // 逐字行：按行回落进度（原先每个字一个动画，改为每行一个）
+    val wordRelease = animateFloatAsState(
+        targetValue = if (isCurrent) 1f else 0f,
+        animationSpec = if (isCurrent) snap() else tween(
+            durationMillis = (200 / wordScaleSpeed).coerceAtLeast(50f).toInt(),
+            easing = FastOutSlowInEasing
+        ),
+        label = "wordRelease"
+    )
 
     // 景深模糊：以“当前居中歌词”为清晰焦点，越往上/下越远越模糊。
     // 距离-模糊映射采用对数曲线：离开中心后快速起糊，再随距离增大逐渐趋缓、逼近最大模糊，
@@ -309,11 +315,13 @@ fun LyricLineItem(
         label = "blur"
     )
 
-    val textColor by animateColorAsState(
-        targetValue = if (isCurrent) Color.White else TextSecondary,
+    // 颜色进度在绘制阶段读取，动画期间不触发重组
+    val colorFraction by animateFloatAsState(
+        targetValue = if (isCurrent) 1f else 0f,
         animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
         label = "textColor"
     )
+    val lineColor: () -> Color = { lerp(TextSecondary, Color.White, colorFraction) }
 
     Column(
         horizontalAlignment = Alignment.Start,
@@ -327,31 +335,30 @@ fun LyricLineItem(
             .let { modifier ->
                 if (animationConfig.enable3DEffect) modifier.lyrics3DEffect(isCurrent, distance) else modifier
             }
-            .let { modifier ->
-                if (animationConfig.enableFlowingLight) {
-                    modifier.flowingLightEffect(
-                        isCurrent = isCurrent,
-                        isPlaying = isPlaying,
-                        reduceEffect = animationConfig.reduceFlowingLightEffect
-                    )
-                } else {
-                    modifier
-                }
-            }
-            .let { modifier ->
-                if (animationConfig.enableGlowEffect) modifier.glowEffect(isCurrent = isCurrent, glowColor = Color.White) else modifier
-            }
             .padding(
                 horizontal = if (isPhone) 24.dp else 32.dp,
                 vertical = 4.dp * lineSpacingRatio
             )
             .let { modifier ->
-                // 景深模糊：居中歌词清晰，越靠上/下越模糊。blur 半径动画期间可能为 0，
-                // 接近 0 时不再套用 blur 层，避免无意义地占用 RenderEffect。
-                if (blurRadius > 0.5f) modifier.blur(blurRadius.dp) else modifier
+                // 景深模糊：半径在绘制阶段读取（等价于 Modifier.blur 默认的矩形裁剪 + Clamp），
+                // 动画期间不重组、不增删修饰符节点；仅在设置开启时才有这一层。
+                if (blurEnabled) {
+                    modifier.graphicsLayer {
+                        if (blurRadius > 0.5f) {
+                            val r = blurRadius.dp.toPx()
+                            renderEffect = androidx.compose.ui.graphics.BlurEffect(
+                                r, r, androidx.compose.ui.graphics.TileMode.Clamp
+                            )
+                            clip = true
+                        } else {
+                            renderEffect = null
+                            clip = false
+                        }
+                    }
+                } else modifier
             }
             .graphicsLayer {
-                alpha = lineAlpha
+                alpha = if (usesWordByWordFlow) 1f else animatedLineAlpha
                 scaleX = scale
                 scaleY = scale
                 transformOrigin = TransformOrigin(0f, 0.5f)
@@ -368,13 +375,12 @@ fun LyricLineItem(
                         .padding(top = (maxFloatOffset / 2).dp),
                     centerLines = false
                 ) {
-                    wordsToUse.forEachIndexed { index, word ->
+                    wordsToUse.forEach { word ->
                         LyricWordItem(
                             word = word,
-                            index = index,
                             line = line,
-                            isCurrent = isCurrent,
                             positionProvider = wordPositionProvider,
+                            release = wordRelease,
                             maxFloatOffset = maxFloatOffset,
                             wordScaleSize = wordScaleSize,
                             wordScaleSpeed = wordScaleSpeed,
@@ -384,23 +390,19 @@ fun LyricLineItem(
                     }
                 }
             } else {
-                Text(
+                LyricText(
                     text = line.text,
-                    color = textColor,
+                    color = lineColor,
                     fontSize = fontSize.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Start,
                     lineHeight = lineHeight.sp,
                     modifier = Modifier.padding(vertical = 4.dp * lineSpacingRatio)
                 )
             }
         } else {
-            Text(
+            LyricText(
                 text = line.text,
-                color = textColor,
+                color = lineColor,
                 fontSize = fontSize.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Start,
                 lineHeight = lineHeight.sp,
                 modifier = Modifier.padding(vertical = 4.dp * lineSpacingRatio)
             )
@@ -414,35 +416,51 @@ fun LyricLineItem(
             enter = fadeIn(animationSpec = tween(animationDuration, easing = FastOutSlowInEasing)),
             exit = fadeOut(animationSpec = tween(animationDuration, easing = FastOutSlowInEasing))
         ) {
-            val translationColor by animateColorAsState(
-                targetValue = textColor,
-                animationSpec = tween(durationMillis = animationDuration, easing = FastOutSlowInEasing),
-                label = "translationColor"
-            )
             val translationFontSize = translationFontSizePref.coerceIn(10f, 40f).sp
             val translationLineHeight = translationFontSize * 1.35f
-            Text(
+            LyricText(
                 text = translationText.orEmpty(),
-                color = translationColor,
+                color = lineColor,
                 fontSize = translationFontSize,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Start,
                 lineHeight = translationLineHeight,
                 modifier = Modifier
                     .padding(top = 2.dp)
-                    .alpha(animatedLineAlpha)
+                    .graphicsLayer { alpha = animatedLineAlpha }
             )
         }
     }
 }
 
+// 与 Material Text 等价（沿用 LocalTextStyle），但颜色以 lambda 传入，仅在绘制阶段读取
+@Composable
+private fun LyricText(
+    text: String,
+    color: () -> Color,
+    fontSize: TextUnit,
+    lineHeight: TextUnit,
+    modifier: Modifier = Modifier
+) {
+    BasicText(
+        text = text,
+        modifier = modifier,
+        style = LocalTextStyle.current.merge(
+            androidx.compose.ui.text.TextStyle(
+                fontSize = fontSize,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Start,
+                lineHeight = lineHeight
+            )
+        ),
+        color = color
+    )
+}
+
 @Composable
 private fun LyricWordItem(
     word: WordInfo,
-    index: Int,
     line: LyricLine,
-    isCurrent: Boolean,
     positionProvider: () -> Long,
+    release: State<Float>,
     maxFloatOffset: Float,
     wordScaleSize: Float,
     wordScaleSpeed: Float,
@@ -453,12 +471,6 @@ private fun LyricWordItem(
     val riseMs = (200 / wordScaleSpeed).coerceAtLeast(50f)
     val pendingAlpha = 0.3f
 
-    // 离开当前行时整体回落；进入当前行时立即生效（不再叠加一层渐入）
-    val release = animateFloatAsState(
-        targetValue = if (isCurrent) 1f else 0f,
-        animationSpec = if (isCurrent) snap() else tween(durationMillis = riseMs.toInt(), easing = FastOutSlowInEasing),
-        label = "wr_${line.timeMs}_${index}"
-    )
     // 0..1 的原始进度：完全由播放位置推出，仅在绘制/布局阶段读取
     fun rawProgress(): Float {
         val pos = positionProvider()

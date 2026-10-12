@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /** 左侧栏 / 歌单页状态。 */
 data class PlaylistUiState(
@@ -51,6 +53,7 @@ class PlaylistViewModel : ViewModel() {
     val uiState: StateFlow<PlaylistUiState> = _uiState.asStateFlow()
 
     private var loaded = false
+    private var openRequestVersion = 0
 
     /**
      * 拉取登录用户歌单。
@@ -103,9 +106,13 @@ class PlaylistViewModel : ViewModel() {
      * 过期缓存会先展示再后台刷新，保证「秒开」。
      */
     fun openPlaylist(playlist: Playlist) {
+        val requestVersion = ++openRequestVersion
         viewModelScope.launch {
             // 1) 先查缓存，命中就秒开、完全不闪 loading
-            val cached = com.example.bna.data.cache.MusicCache.readPlaylistSongs(playlist.id)
+            val cached = withContext(Dispatchers.IO) {
+                com.example.bna.data.cache.MusicCache.readPlaylistSongs(playlist.id)
+            }
+            if (requestVersion != openRequestVersion) return@launch
             if (cached != null) {
                 _uiState.value = _uiState.value.copy(
                     detail = PlaylistDetailUiState(
@@ -131,6 +138,7 @@ class PlaylistViewModel : ViewModel() {
                     allowStale = true,
                     forceRefresh = true
                 )
+                if (requestVersion != openRequestVersion) return@launch
                 _uiState.value = _uiState.value.copy(
                     detail = PlaylistDetailUiState(
                         playlist = playlist,
@@ -140,6 +148,7 @@ class PlaylistViewModel : ViewModel() {
                     )
                 )
             } catch (e: PlaylistLoadException) {
+                if (requestVersion != openRequestVersion) return@launch
                 val cur = _uiState.value.detail
                 // 已有缓存数据时不打断浏览，只记错误
                 _uiState.value = _uiState.value.copy(
@@ -194,6 +203,7 @@ class PlaylistViewModel : ViewModel() {
      * 同时清掉账号相关的磁盘缓存，避免下一个账号看到上一个账号的歌单。
      */
     fun clear() {
+        ++openRequestVersion
         loaded = false
         _uiState.value = PlaylistUiState()
         com.example.bna.data.cache.MusicCache.clearUserData()

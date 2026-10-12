@@ -10,6 +10,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,12 +51,16 @@ fun PlaylistDetailScreen(
     playlistViewModel: PlaylistViewModel = viewModel()
 ) {
     val state by playlistViewModel.uiState.collectAsState()
-    val detail = state.detail
+    val targetId = playlist?.id ?: playlistId
+    // The outgoing page retains its own songs while the incoming page loads.
+    val matchingDetail = state.detail?.takeIf { it.playlist?.id == targetId }
+    var retainedDetail by remember(targetId) { mutableStateOf(matchingDetail) }
+    SideEffect { if (matchingDetail != null) retainedDetail = matchingDetail }
+    val detail = matchingDetail ?: retainedDetail
 
     // 若由 selectedId 恢复进来，先补拉歌单详情
-    val targetId = playlist?.id ?: playlistId
     LaunchedEffect(targetId) {
-        if (targetId != null && targetId != detail?.playlist?.id) {
+        if (targetId != null && targetId != state.detail?.playlist?.id) {
             val known = playlist ?: state.playlists.firstOrNull { it.id == targetId }
             if (known != null) {
                 playlistViewModel.openPlaylist(known)
@@ -72,7 +80,7 @@ fun PlaylistDetailScreen(
                 if (detail?.isLoading == true || detail?.isRefreshing == true) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = Color(0xFF32C85A),
+                        color = LocalHomeColors.current.accent,
                         strokeWidth = 2.dp
                     )
                 } else {
@@ -99,7 +107,7 @@ fun PlaylistDetailScreen(
             when {
                 detail?.isLoading == true && detail.songs.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFF32C85A))
+                        CircularProgressIndicator(color = LocalHomeColors.current.accent)
                     }
                 }
 
@@ -129,7 +137,7 @@ fun PlaylistDetailScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = if (isTablet) 30.dp else 8.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp)
+                        contentPadding = PaddingValues(bottom = LocalHomeListBottomPadding.current)
                     ) {
                         items(songs, key = { it.id }) { song ->
                             SongListRow(

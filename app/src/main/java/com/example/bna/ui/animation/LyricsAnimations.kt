@@ -30,44 +30,6 @@ fun Modifier.lyrics3DEffect(
     }
 )
 
-@Composable
-fun Modifier.flowingLightEffect(
-    isCurrent: Boolean,
-    isPlaying: Boolean,
-    reduceEffect: Boolean = false
-): Modifier {
-    if (!isCurrent || !isPlaying) {
-        return this
-    }
-    
-    // Gradient overlay disabled to remove rectangular shading on the active line.
-    return this.then(
-        Modifier.drawWithContent {
-            drawContent()
-        }
-    )
-}
-
-@Composable
-fun Modifier.glowEffect(
-    isCurrent: Boolean,
-    glowColor: Color = Color.White,
-    maxRadius: Float = 24f,
-    maxAlpha: Float = 0.6f
-): Modifier {
-    if (!isCurrent) {
-        return this
-    }
-    
-    // We remove the square box drawing. Real text glow should be done via TextStyle shadows.
-    return this.then(
-        Modifier.drawWithContent {
-            drawContent()
-        }
-    )
-}
-
-
 data class LyricsAnimationConfig(
     val enable3DEffect: Boolean = true,
     val enableFlowingLight: Boolean = true,

@@ -46,10 +46,9 @@ fun LyricsScreen(
     }
 
     LaunchedEffect(Unit) {
-        // 动画帧数锁定为60帧 (1000ms / 60fps ≈ 16.66ms)
-        val frameDelay = 1000L / 60L
+        // 与屏幕帧同步检测换行（二分查找，开销可忽略）
         while (true) {
-            delay(frameDelay)
+            androidx.compose.runtime.withFrameNanos { }
             lyricsViewModel.updateCurrentLine(MusicPlayer.getCurrentPosition())
         }
     }

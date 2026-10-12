@@ -1,13 +1,38 @@
 package com.example.bna.ui.screen
 
 import android.widget.Toast
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import coil.compose.AsyncImage
+import com.example.bna.player.MusicPlayer
+import kotlin.math.roundToInt
 import androidx.compose.animation.*
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,8 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.bna.ui.animation.SaltMotion
-import com.example.bna.ui.theme.DarkBackground
 import com.example.bna.viewmodel.LoginViewModel
 import com.example.bna.viewmodel.PlaylistViewModel
 import com.example.bna.viewmodel.SearchViewModel
@@ -92,7 +115,35 @@ fun MainScreen(
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    val playerState by MusicPlayer.playerState.collectAsState()
+    val homeColors = rememberHomeColors(playerState.currentSong?.albumCoverUrl.orEmpty())
+    val flight = remember { CoverFlight() }
+    val reveal = remember { Animatable(if (showLyricsScreen) 1f else 0f) }
+    var rootOrigin by remember { mutableStateOf(Offset.Zero) }
+    var miniBarBounds by remember { mutableStateOf<Rect?>(null) }
+    LaunchedEffect(showLyricsScreen) {
+        if (showLyricsScreen) {
+            // Wait for the destination's real layout, including user cover calibration.
+            var frames = 0
+            while (flight.expanded == null && frames++ < 20) withFrameNanos { }
+        }
+        flight.active = flight.mini != null && flight.expanded != null
+        try {
+            reveal.animateTo(if (showLyricsScreen) 1f else 0f,
+                tween(if (showLyricsScreen) 520 else 420, easing = HomeEase))
+        } finally {
+            flight.active = false
+        }
+        if (!showLyricsScreen) flight.expanded = null
+    }
+    LaunchedEffect(playerState.currentSong?.id) {
+        if (playerState.currentSong == null) showLyricsScreen = false
+    }
+    val navigationBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val listBottomPadding = (if (playerState.currentSong != null) 112.dp else 24.dp) + navigationBottom
+    CompositionLocalProvider(LocalHomeColors provides homeColors, LocalCoverFlight provides flight,
+        LocalHomeListBottomPadding provides listBottomPadding) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(homeColors.background).onGloballyPositioned { rootOrigin = it.positionInRoot() }) {
         // salt: isTablet = maxWidth >= 640dp
         val isTablet = maxWidth >= 640.dp
         val sidebarWidth = when {
@@ -128,8 +179,7 @@ fun MainScreen(
                         searchViewModel = searchViewModel,
                         onLogout = handleLogout,
                         onOpenMenu = null,
-                        isTablet = true,
-                        onOpenLyrics = { showLyricsScreen = true }
+                        isTablet = true
                     )
                 }
             }
@@ -140,7 +190,7 @@ fun MainScreen(
                 drawerContent = {
                     ModalDrawerSheet(
                         modifier = Modifier.width(sidebarWidth.dp),
-                        drawerContainerColor = DarkBackground
+                        drawerContainerColor = homeColors.background
                     ) {
                         SidebarMenu(
                             selectedId = selectedId,
@@ -164,30 +214,72 @@ fun MainScreen(
                     searchViewModel = searchViewModel,
                     onLogout = handleLogout,
                     onOpenMenu = openMenu,
-                    isTablet = false,
-                    onOpenLyrics = { showLyricsScreen = true }
+                    isTablet = false
                 )
             }
         }
 
-        // 歌词页全屏弹出（原有行为，曲线换成 salt 的"空间"规格）
-        AnimatedVisibility(
-            visible = showLyricsScreen,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = SaltMotion.SlowSpatialOffset
-            ) + fadeIn(animationSpec = SaltMotion.DefaultEffects),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = SaltMotion.FastSpatialOffset
-            ) + fadeOut(animationSpec = SaltMotion.FastEffects)
-        ) {
-            LyricsScreen(onDismiss = { showLyricsScreen = false })
+        // A single floating bar is centered in the entire main window.
+        Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
+            .padding(horizontal = if (isTablet) 32.dp else 16.dp, vertical = 20.dp)) {
+            Box(Modifier.widthIn(max = 620.dp)
+                .onGloballyPositioned { miniBarBounds = it.boundsInRoot() }
+                .graphicsLayer { alpha = (1f - reveal.value * 5f).coerceIn(0f, 1f) }
+                .shadow(24.dp, RoundedCornerShape(24.dp))) {
+                PlayerBar(onClick = { showLyricsScreen = true })
+            }
         }
+
+        // Keep the player at its final layout size; only its visible shell expands.
+        // This preserves stable cover coordinates and the existing calibrated layout.
+        if (showLyricsScreen || reveal.value > 0f) {
+            val source = miniBarBounds
+            Box(Modifier.fillMaxSize().drawWithContent {
+                val fraction = reveal.value
+                val full = Rect(0f, 0f, size.width, size.height)
+                val origin = source?.translate(-rootOrigin) ?: Rect(0f, size.height, size.width, size.height)
+                val shell = androidx.compose.ui.geometry.lerp(origin, full, fraction)
+                val corner = 24.dp.toPx() * (1f - fraction)
+                val mask = Path().apply { addRoundRect(RoundRect(shell, CornerRadius(corner))) }
+                clipPath(mask) {
+                    drawRect(Brush.horizontalGradient(listOf(
+                        androidx.compose.ui.graphics.lerp(homeColors.surface, homeColors.background, fraction),
+                        androidx.compose.ui.graphics.lerp(
+                            androidx.compose.ui.graphics.lerp(homeColors.surface, homeColors.accent, 0.09f),
+                            homeColors.background, fraction))))
+                    this@drawWithContent.drawContent()
+                }
+            }) {
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    // The expanding card appears first, followed by player controls.
+                    alpha = ((reveal.value - 0.12f) / 0.68f).coerceIn(0f, 1f)
+                }) {
+                    LyricsScreen(onDismiss = { showLyricsScreen = false })
+                }
+            }
+        }
+        val start = flight.mini
+        val end = flight.expanded
+        if (flight.active && start != null && end != null) {
+            val fraction = reveal.value
+            val rect = androidx.compose.ui.geometry.lerp(start, end, fraction)
+            val density = LocalDensity.current
+            val radius = if (maxWidth >= 600.dp) 8f else 22f
+            Box(Modifier
+                .offset { IntOffset((rect.left - rootOrigin.x).roundToInt(), (rect.top - rootOrigin.y).roundToInt()) }
+                .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
+                .clip(RoundedCornerShape((12f + (radius - 12f) * fraction).dp))
+                .background(homeColors.surface), contentAlignment = Alignment.Center) {
+                AsyncImage(model = playerState.currentSong?.albumCoverUrl?.plus("?param=800y800"),
+                    placeholder = flight.artwork, error = flight.artwork,
+                    contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
     }
 }
 
-/** 右侧内容：底部播放条 + 当前栏目页面。 */
+/** 右侧栏目铺满主界面，列表末尾的滚动留白由各页面处理。 */
 @Composable
 private fun MainContent(
     selectedId: String,
@@ -196,23 +288,25 @@ private fun MainContent(
     searchViewModel: SearchViewModel,
     onLogout: () -> Unit,
     onOpenMenu: (() -> Unit)?,
-    isTablet: Boolean,
-    onOpenLyrics: () -> Unit
+    isTablet: Boolean
 ) {
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = DarkBackground,
-        bottomBar = {
-            PlayerBar(onClick = onOpenLyrics)
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            // ── 栏目切换：salt 用 Crossfade（`g52.java:28` → `aq.m468`，
-            //    规格 `a61.DefaultEffects` = spring(1.0f, 1600f)）──
-            Crossfade(
+    val colors = LocalHomeColors.current
+    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(androidx.compose.ui.graphics.lerp(colors.background, colors.surface, 0.45f), colors.background)))) {
+        Box(Modifier.fillMaxSize()) {
+            AnimatedContent(
                 targetState = selectedId,
-                animationSpec = SaltMotion.pageSwitch,
-                label = "Crossfade"
+                modifier = Modifier.fillMaxSize().clipToBounds(),
+                transitionSpec = {
+                    // Both pages move together, without fades or size animation.
+                    val motion = tween<androidx.compose.ui.unit.IntOffset>(
+                        durationMillis = 340,
+                        easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+                    )
+                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, motion)
+                        .togetherWith(slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, motion))
+                        .using(null)
+                },
+                label = "libraryNavigation"
             ) { currentId ->
                 when {
                     currentId == "search" -> SongLibraryScreen(

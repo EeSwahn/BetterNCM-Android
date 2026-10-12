@@ -3,6 +3,25 @@ package com.example.bna.ui.screen.lyrics
 import android.content.Context
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import com.example.bna.player.MusicPlayer
+import com.example.bna.player.PlayerState
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+
+/** 播放状态（忽略 32ms 刷新一次的 currentPosition），位置变化不会触发订阅方重组 */
+@Composable
+fun rememberPlayerStateWithoutPosition(): State<PlayerState> {
+    val flow = remember {
+        MusicPlayer.playerState.map { it.copy(currentPosition = 0L) }.distinctUntilChanged()
+    }
+    return flow.collectAsState(initial = MusicPlayer.playerState.value.copy(currentPosition = 0L))
+}
+
+@Composable
+fun rememberIsPlaying(): State<Boolean> {
+    val flow = remember { MusicPlayer.playerState.map { it.isPlaying }.distinctUntilChanged() }
+    return flow.collectAsState(initial = MusicPlayer.playerState.value.isPlaying)
+}
 
 @Composable
 fun rememberFloatPreference(key: String, defaultValue: Float): MutableState<Float> {

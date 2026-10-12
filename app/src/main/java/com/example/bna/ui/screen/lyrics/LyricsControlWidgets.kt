@@ -1,6 +1,7 @@
 package com.example.bna.ui.screen.lyrics
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -35,6 +37,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
@@ -64,6 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -491,6 +496,17 @@ fun LyricsSettingsBottomSheet(
     val context = LocalContext.current
     BackHandler { onDismiss() }
 
+    var onRight by remember { mutableStateOf(false) }
+    val sideProgress by animateFloatAsState(
+        targetValue = if (onRight) 1f else 0f,
+        animationSpec = tween(460, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)),
+        label = "tabletSettingsSide"
+    )
+    var appeared by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { appeared = true }
+    val entrance by animateFloatAsState(if (appeared) 1f else 0f,
+        tween(240, easing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)), label = "settingsEntrance")
+
     // 自定义底部浮层：不用官方 ModalBottomSheet，避免滚动内容时被误收起。
     val density = LocalDensity.current
     var dragPx by remember { mutableStateOf(0f) }
@@ -507,12 +523,18 @@ fun LyricsSettingsBottomSheet(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()
+        .then(if (isPhone) Modifier else Modifier.safeDrawingPadding())) {
+        val panelHeight = minOf(760.dp, (maxHeight - 48.dp).coerceAtLeast(0.dp))
+        val panelWidth = minOf(400.dp, maxWidth - 48.dp, panelHeight * 0.82f).coerceAtLeast(0.dp)
+        val travelPx = with(density) { (maxWidth - panelWidth - 48.dp).coerceAtLeast(0.dp).toPx() }
+        val panelShape = if (isPhone) RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+            else RoundedCornerShape(28.dp)
         // 遮罩：点按关闭
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.55f))
+                .background(if (isPhone) Color.Black.copy(alpha = 0.55f) else Color.Transparent)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -522,17 +544,25 @@ fun LyricsSettingsBottomSheet(
         // 底部面板：顶部把手可跟手下拖收起；内容区自由滚动，绝不因滚动误收起
         Column(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .graphicsLayer { translationY = dragPx }
-                .heightIn(max = if (isPhone) 620.dp else 760.dp)
-                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                .background(DarkBackground)
-                .navigationBarsPadding()
-                .padding(horizontal = if (isPhone) 20.dp else 28.dp)
-                .padding(bottom = 20.dp)
+                .align(if (isPhone) Alignment.BottomCenter else Alignment.CenterStart)
+                .then(if (isPhone) Modifier.fillMaxWidth().heightIn(max = 620.dp)
+                    else Modifier.offset(x = 24.dp).width(panelWidth).height(panelHeight))
+                .graphicsLayer {
+                    translationX = if (isPhone) 0f else travelPx * sideProgress
+                    translationY = if (isPhone) dragPx else (1f - entrance) * 12.dp.toPx()
+                    alpha = if (isPhone) 1f else entrance
+                }
+                .then(if (isPhone) Modifier else Modifier.shadow(24.dp, panelShape))
+                .clip(panelShape)
+                .background(if (isPhone) DarkBackground else Color(0xF51B202B))
+                .then(if (isPhone) Modifier.navigationBarsPadding()
+                    else Modifier.border(1.dp, Color.White.copy(alpha = 0.10f), panelShape))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+                .padding(horizontal = 20.dp)
+                .padding(top = if (isPhone) 0.dp else 20.dp, bottom = 20.dp)
         ) {
-            // 顶部把手
+            // 手机保留下拖把手；平板为独立悬浮卡片。
+            if (isPhone) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -553,6 +583,7 @@ fun LyricsSettingsBottomSheet(
                         .clip(RoundedCornerShape(3.dp))
                         .background(Color.White.copy(alpha = 0.3f))
                 )
+            }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -575,6 +606,16 @@ fun LyricsSettingsBottomSheet(
                         fontSize = 12.sp,
                         lineHeight = 18.sp
                     )
+                }
+                if (!isPhone) {
+                    IconButton(onClick = { onRight = !onRight }, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            imageVector = if (onRight) Icons.AutoMirrored.Filled.KeyboardArrowLeft
+                                else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (onRight) "移到左侧" else "移到右侧",
+                            tint = TextSecondary
+                        )
+                    }
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
                     Icon(

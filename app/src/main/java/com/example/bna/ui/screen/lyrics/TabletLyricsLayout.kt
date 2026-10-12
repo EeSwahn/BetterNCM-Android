@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import com.example.bna.ui.screen.flightCover
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.example.bna.data.model.Song
@@ -319,7 +320,6 @@ fun TabletLyricsLayout(
                         breathAnim.snapTo(1.0f)
                     }
                 }
-                val effectiveGlowAlpha = glowBrightness * breathAnim.value
 
                 Box(
                     modifier = Modifier
@@ -330,18 +330,20 @@ fun TabletLyricsLayout(
                     // 发光层
                     if (glowBrightness > 0.01f && song.albumCoverUrl.isNotEmpty()) {
                         val colorMatrix = remember { ColorMatrix().apply { setToSaturation(1.4f) } }
+                        // 1/4 分辨率离屏模糊再放大，呼吸 alpha 只在合成阶段变化
+                        LowResLayer(
+                            modifier = Modifier
+                                .requiredSize(coverEdge * glowScaleSize)
+                                .clip(RoundedCornerShape(8.dp * glowScaleSize)),
+                            alpha = { 0.6f * breathAnim.value }
+                        ) {
                         AsyncImage(
                             model = song.albumCoverUrl + "?param=32y32",
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             colorFilter = ColorFilter.colorMatrix(colorMatrix),
                             modifier = Modifier
-                                .requiredSize(coverEdge * glowScaleSize)
-                                .clip(RoundedCornerShape(8.dp * glowScaleSize))
-                                .graphicsLayer { 
-                                    alpha = 0.6f * breathAnim.value 
-                                    compositingStrategy = CompositingStrategy.Offscreen
-                                }
+                                .fillMaxSize()
                                 .drawWithContent {
                                     drawContent()
                                     val fadeFraction = 0.15f
@@ -370,12 +372,14 @@ fun TabletLyricsLayout(
                                 }
                                 .blur(48.dp, BlurredEdgeTreatment.Unbounded)
                         )
+                        }
                     }
 
                     // 封面本体
                     Box(
                         modifier = Modifier
                             .size(coverEdge)
+                        .flightCover(expanded = true)
                             .clip(RoundedCornerShape(8.dp))
                     ) {
                         if (song.albumCoverUrl.isNotEmpty()) {
@@ -412,7 +416,7 @@ fun TabletLyricsLayout(
 
             // 播放列表层：随 openPx 从底部露出，占据原左栏；右栏歌词保持不动
             if (maxOpenPx > 0f) {
-                val ps by com.example.bna.player.MusicPlayer.playerState.collectAsState()
+                val ps by rememberPlayerStateWithoutPosition()
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -477,8 +481,8 @@ fun TabletLyricsLayout(
 
     if (showSettings) {
         LyricsSettingsBottomSheet(
-            title = "歌词布局与动画",
-            subtitle = "平板模式下把动画参数和布局校准拆成几组，避免一长串滑块直接铺在正文里。",
+            title = "播放设置",
+            subtitle = "调整布局与动画，实时预览效果。",
             isPhone = false,
             wordByWordEnabled = enableWordByWord,
             onWordByWordChange = { enableWordByWord = it },

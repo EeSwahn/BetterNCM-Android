@@ -121,7 +121,9 @@ fun FlowingLightBackground(coverUrl: String, modifier: Modifier = Modifier) {
     )
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 光斑 + 渐变图层（整体硬件模糊）
+        // 光斑 + 渐变图层（整体硬件模糊）。以 1/4 分辨率离屏绘制+模糊再放大：
+        // 视觉一致，但全屏模糊每帧的像素开销降为约 1/16。
+        LowResLayer(modifier = Modifier.fillMaxSize()) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -166,6 +168,7 @@ fun FlowingLightBackground(coverUrl: String, modifier: Modifier = Modifier) {
                 )
             }
         }
+        }
 
         // 暗色 scrim，保证歌词可读
         Box(
@@ -196,12 +199,12 @@ private data class BlobSpec(
     val breathPhase: Float
 )
 
-private data class ExtractedPalette(
+internal data class ExtractedPalette(
     val baseColor: Color,
     val accentColors: List<Color>
 )
 
-private val DEFAULT_PALETTE = ExtractedPalette(
+internal val DEFAULT_PALETTE = ExtractedPalette(
     baseColor = Color(0xFF141A26),
     accentColors = listOf(
         Color(0xFF3A5A8C),
@@ -212,7 +215,7 @@ private val DEFAULT_PALETTE = ExtractedPalette(
 )
 
 /** 自研量化取色（禁止 androidx.palette）。 */
-private suspend fun extractPaletteFromCover(
+internal suspend fun extractPaletteFromCover(
     context: android.content.Context,
     coverUrl: String
 ): ExtractedPalette = withContext(Dispatchers.Default) {

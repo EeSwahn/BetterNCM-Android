@@ -12,7 +12,6 @@ import kotlinx.coroutines.launch
 
 data class LyricsUiState(
     val lyrics: List<LyricLine> = emptyList(),
-    val currentLineIndex: Int = -1,
     val isLoading: Boolean = false,
     val hasNoLyric: Boolean = false,
     val lyricErrorMessage: String? = null,
@@ -29,11 +28,16 @@ class LyricsViewModel : ViewModel() {
     private val _state = MutableStateFlow(LyricsUiState())
     val state: StateFlow<LyricsUiState> = _state.asStateFlow()
 
+    // 当前行单独成流：换行时不再让整个歌词页（依赖 state 的布局）重组
+    private val _currentLineIndex = MutableStateFlow(-1)
+    val currentLineIndex: StateFlow<Int> = _currentLineIndex.asStateFlow()
+
     private var loadedSongId: Long = -1L
 
     fun loadLyrics(songId: Long) {
         if (loadedSongId == songId) return
         loadedSongId = songId
+        _currentLineIndex.value = -1
         _state.value = LyricsUiState(isLoading = true)
 
         // songId = -1L 代表本地测试歌曲，使用内置歌词
@@ -55,7 +59,7 @@ class LyricsViewModel : ViewModel() {
                     if (yrcText.isNotBlank()) {
                         try {
                             val lines = parseYrc(yrcText, transText)
-                            val validLines = lines.filter { it.text.isNotBlank() }
+                            val validLines = lines.filter { it.text.isNotBlank() }.sortedBy { it.timeMs }
                             val timedLineCount = validLines.count { !it.words.isNullOrEmpty() }
                             if (validLines.isNotEmpty() && timedLineCount > 0) {
                                 parsedLyrics = validLines
@@ -102,18 +106,30 @@ class LyricsViewModel : ViewModel() {
         }
     }
 
-    /** 外部每 100ms 调用一次，传入当前播放位置，自动计算高亮行 */
+    /** 外部按帧调用，传入当前播放位置，自动计算高亮行（歌词按时间升序，二分查找） */
     fun updateCurrentLine(positionMs: Long) {
         val lyrics = _state.value.lyrics
         if (lyrics.isEmpty()) return
-        val idx = lyrics.indexOfLast { it.timeMs <= positionMs }
-        if (idx != _state.value.currentLineIndex) {
-            _state.value = _state.value.copy(currentLineIndex = idx)
+        var lo = 0
+        var hi = lyrics.size - 1
+        var idx = -1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            if (lyrics[mid].timeMs <= positionMs) {
+                idx = mid
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+        if (idx != _currentLineIndex.value) {
+            _currentLineIndex.value = idx
         }
     }
 
     fun reset() {
         loadedSongId = -1L
+        _currentLineIndex.value = -1
         _state.value = LyricsUiState()
     }
 

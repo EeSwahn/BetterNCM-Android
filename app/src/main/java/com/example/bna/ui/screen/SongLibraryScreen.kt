@@ -103,13 +103,13 @@ fun SongLibraryScreen(
                 when {
                     uiState.isSearching -> {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Color(0xFF32C85A))
+                            CircularProgressIndicator(color = LocalHomeColors.current.accent)
                         }
                     }
                     uiState.hasSearched -> {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(bottom = 24.dp)
+                            contentPadding = PaddingValues(bottom = LocalHomeListBottomPadding.current)
                         ) {
                             items(
                                 items = uiState.songs,

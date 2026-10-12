@@ -195,7 +195,7 @@ fun PlaybackButtonsOnly(
     buttonSizeRatio: Float = 1f,
     buttonSpacingDp: Float = 0f
 ) {
-    val playerState by MusicPlayer.playerState.collectAsState()
+    val isPlaying by rememberIsPlaying()
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         // 宽度不足时先压缩间距、再整体缩小按钮，保证“上一首/下一首”始终完整显示
         val minSpacing = 8.dp
@@ -229,9 +229,9 @@ fun PlaybackButtonsOnly(
             IconButton(onClick = { MusicPlayer.togglePlayPause() }, modifier = Modifier.size(playSize)) {
                 Icon(
                     painter = painterResource(
-                        if (playerState.isPlaying) R.drawable.salt_ic_pause_btn else R.drawable.salt_ic_play_btn
+                        if (isPlaying) R.drawable.salt_ic_pause_btn else R.drawable.salt_ic_play_btn
                     ),
-                    contentDescription = if (playerState.isPlaying) "暂停" else "播放",
+                    contentDescription = if (isPlaying) "暂停" else "播放",
                     tint = Color.White,
                     modifier = Modifier.size(playIcon)
                 )

@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -116,8 +119,8 @@ fun SidebarMenu(
         modifier = modifier
             .width(width.dp)
             .fillMaxHeight()
-            .background(Color(0xFF161819)),
-        contentPadding = PaddingValues(vertical = 8.dp)
+            .background(LocalHomeColors.current.background),
+        contentPadding = PaddingValues(top = 8.dp, bottom = LocalHomeListBottomPadding.current)
     ) {
         // ── 固定栏目：音乐搜索 ──
         item(key = "fixed") {
@@ -153,7 +156,7 @@ fun SidebarMenu(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
-                            color = Color(0xFF32C85A),
+                            color = LocalHomeColors.current.accent,
                             strokeWidth = 2.dp
                         )
                     }
@@ -217,7 +220,7 @@ private fun SidebarSectionHeader(
             if (loading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
-                    color = Color(0xFF32C85A),
+                    color = LocalHomeColors.current.accent,
                     strokeWidth = 2.dp
                 )
             } else {
@@ -277,7 +280,7 @@ private fun SidebarCard(
     )
     val borderColor by animateColorAsState(
         targetValue = if (borderWidth > 0.dp) Color.White.copy(alpha = 0.14f) else Color.Transparent,
-        animationSpec = SaltMotion.FastEffectsColor,
+        animationSpec = tween(240, easing = HomeEase),
         label = "cardBorderColor"
     )
 
@@ -314,14 +317,16 @@ private fun SidebarRow(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val shift by animateDpAsState(if (selected) 4.dp else 0.dp, tween(320, easing = HomeEase), label = "selectionShift")
     val background by animateColorAsState(
-        targetValue = if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent,
-        animationSpec = SaltMotion.FastEffectsColor,
+        targetValue = if (selected) LocalHomeColors.current.accent.copy(alpha = 0.14f) else Color.Transparent,
+        animationSpec = tween(240, easing = HomeEase),
         label = "rowBg"
     )
     val textColor by animateColorAsState(
         targetValue = if (selected) Color.White else Color(0xFFC8C8C8),
-        animationSpec = SaltMotion.FastEffectsColor,
+        animationSpec = tween(240, easing = HomeEase),
         label = "rowText"
     )
     // 选中时图标轻微放大，模仿 salt 的按压/选中反馈
@@ -334,16 +339,18 @@ private fun SidebarRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .homePress(interaction)
+            .offset(x = shift)
             .clip(SidebarItemShape)
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = item.icon,
             contentDescription = item.label,
-            tint = item.color,
+            tint = LocalHomeColors.current.accent,
             modifier = Modifier
                 .size(24.dp)
                 .graphicsLayer {
@@ -379,23 +386,28 @@ private fun PlaylistRow(
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val shift by animateDpAsState(if (selected) 4.dp else 0.dp, tween(320, easing = HomeEase), label = "selectionShift")
     val background by animateColorAsState(
-        targetValue = if (selected) Color.White.copy(alpha = 0.10f) else Color.Transparent,
-        animationSpec = SaltMotion.FastEffectsColor,
+        targetValue = if (selected) LocalHomeColors.current.accent.copy(alpha = 0.14f) else Color.Transparent,
+        animationSpec = tween(240, easing = HomeEase),
         label = "plRowBg"
     )
     val textColor by animateColorAsState(
         targetValue = if (selected) Color.White else Color(0xFFC8C8C8),
-        animationSpec = SaltMotion.FastEffectsColor,
+        animationSpec = tween(240, easing = HomeEase),
         label = "plRowText"
     )
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = SidebarCardHorizontalPadding)
+            .homePress(interaction)
+            .offset(x = shift)
             .clip(SidebarItemShape)
             .background(background)
-            .clickable(onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
