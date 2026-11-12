@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
+import coil.imageLoader
 import coil.compose.AsyncImage
 import com.example.bna.ui.screen.flightCover
 import coil.request.ImageRequest
@@ -169,7 +170,8 @@ fun PhoneLyricsLayout(
     LaunchedEffect(song.albumCoverUrl) {
         if (song.albumCoverUrl.isNotEmpty()) {
             try {
-                val loader = ImageLoader(context)
+                // 复用全局共享 ImageLoader：每首歌新建实例会不断累积线程池/缓存/连接池，导致越播越卡
+                val loader = context.imageLoader
                 val request = ImageRequest.Builder(context)
                     .data(song.albumCoverUrl + "?param=200y200")
                     .allowHardware(false)
